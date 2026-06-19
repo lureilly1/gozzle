@@ -7,3 +7,10 @@ coverage/
 *.tsbuildinfo
 .DS_Store
 
+# Next.js / fumadocs (apps/web)
+.next/
+out/
+.source/
+next-env.d.ts
+.vercel
+

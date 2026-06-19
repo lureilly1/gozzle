@@ -29,15 +29,15 @@ jobs:
         run: npm ci
 
       - name: Set canary version
-        run: npm version "0.0.1-canary.${GITHUB_RUN_NUMBER}" --no-git-tag-version
+        run: npm version "0.0.1-canary.${GITHUB_RUN_NUMBER}" --no-git-tag-version -w @gozzle/cli
 
       - name: Build
-        run: npm run build
+        run: npm run build -w @gozzle/cli
 
       - name: Test
-        run: npm test
+        run: npm test -w @gozzle/cli
 
       - name: Publish canary
-        run: npm publish --tag canary --access public
+        run: npm publish -w @gozzle/cli --tag canary --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.SECRET_KEY }}

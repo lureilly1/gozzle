@@ -1,40 +1,19 @@
 {
-  "name": "@gozzle/cli",
-  "version": "0.0.1-canary.0",
-  "description": "A local safety harness and developer toolkit for ClickHouse.",
-  "type": "module",
-  "private": false,
+  "name": "gozzle-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Monorepo for gozzle — a local safety harness and developer toolkit for ClickHouse.",
   "license": "MIT",
-  "bin": {
-    "gozzle": "./dist/src/cli.js",
-    "gozzle-mcp": "./dist/src/mcp/server.js"
-  },
-  "files": [
-    "dist/src",
-    "README.md"
+  "workspaces": [
+    "packages/*",
+    "apps/*"
   ],
-  "publishConfig": {
-    "access": "public",
-    "tag": "canary"
-  },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "dev:mcp": "tsx src/mcp/server.ts",
-    "dev": "tsx src/cli.ts",
-    "lint": "tsc -p tsconfig.json --noEmit",
-    "prepublishOnly": "npm run build && npm test",
-    "smoke:mcp": "npm run build && node dist/scripts/mcp-smoke.js",
-    "test": "node --import tsx --test tests/**/*.test.ts"
-  },
-  "dependencies": {
-    "@clickhouse/client": "^1.21.0",
-    "@modelcontextprotocol/sdk": "^1.18.0",
-    "zod": "^3.25.0"
-  },
-  "devDependencies": {
-    "@types/node": "^22.15.0",
-    "tsx": "^4.20.0",
-    "typescript": "^5.8.0"
+    "build": "npm run build --workspaces --if-present",
+    "build:cli": "npm run build -w @gozzle/cli",
+    "build:web": "npm run build -w @gozzle/web",
+    "dev:web": "npm run dev -w @gozzle/web",
+    "test": "npm run test -w @gozzle/cli"
   },
   "engines": {
     "node": ">=22"

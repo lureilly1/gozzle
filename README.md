@@ -2,63 +2,33 @@
 
 A safety harness for your ClickHouse, inside your own AI.
 
-Gozzle is a local developer toolkit for ClickHouse. The AI reasons; Gozzle runs checks and produces proof.
+This repository is an [npm workspaces](https://docs.npmjs.com/cli/using-npm/workspaces) monorepo.
 
-## Install
+## Layout
 
-For early canary builds:
+| Path | Package | Description |
+| --- | --- | --- |
+| `packages/cli` | [`@gozzle/cli`](packages/cli/README.md) | The CLI and MCP stdio server (published to npm). |
+| `apps/web` | `@gozzle/web` (private) | Documentation site — Next.js + [Fumadocs](https://fumadocs.dev). Placeholder for now. |
 
-```bash
-npm install -g @gozzle/cli@canary
-```
-
-Then print the MCP config snippet:
-
-```bash
-gozzle init
-```
-
-Add the printed config to Claude, Cursor, Codex, or another MCP host.
-
-## Development
+## Getting started
 
 ```bash
-npm install
-npm run build
-npm test
+npm install          # installs all workspaces
+npm run build        # builds every workspace
+npm test             # runs the @gozzle/cli test suite
 ```
 
-## ClickHouse Connection
-
-Gozzle reads ClickHouse connection details from environment variables:
+### Working on a single package
 
 ```bash
-GOZZLE_CLICKHOUSE_URL=http://localhost:8123
-GOZZLE_CLICKHOUSE_USER=default
-GOZZLE_CLICKHOUSE_PASSWORD=
-GOZZLE_CLICKHOUSE_DATABASE=default
+npm run build:cli    # build @gozzle/cli
+npm run build:web    # build the docs site
+npm run dev:web      # run the docs site locally (http://localhost:3000)
 ```
 
-The `GOZZLE_` variables take precedence over the equivalent `CLICKHOUSE_` variables.
-Use a read-only ClickHouse user; Gozzle does not need write access.
+## Publishing
 
-## Entry Points
-
-- `gozzle`: CLI entrypoint.
-- `gozzle-mcp`: MCP stdio server entrypoint.
-
-## Canary Publishing
-
-```bash
-npm login
-npm run build
-npm test
-npm publish --tag canary --access public
-```
-
-For later canaries:
-
-```bash
-npm version prerelease --preid canary
-npm publish --tag canary --access public
-```
+`@gozzle/cli` is published as a canary on every push to `main` via
+`.github/workflows/publish-canary.yml`. See
+[`packages/cli/README.md`](packages/cli/README.md) for details.
