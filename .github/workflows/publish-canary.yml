@@ -1,0 +1,43 @@
+name: Publish Canary
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: https://registry.npmjs.org
+          scope: "@gozzle"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Set canary version
+        run: npm version "0.0.1-canary.${GITHUB_RUN_NUMBER}" --no-git-tag-version
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test
+
+      - name: Publish canary
+        run: npm publish --tag canary --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.SECRET_KEY }}
