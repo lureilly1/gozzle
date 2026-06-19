@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+import { realpathSync } from "node:fs";
+import { pathToFileURL } from "node:url";
+
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
@@ -28,7 +31,11 @@ export async function startMcpServer(): Promise<void> {
   await server.connect(transport);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Resolve the entry path through symlinks: npm global bins (e.g. `gozzle-mcp`)
+// and how Claude Code launches MCP servers invoke this file via a symlink, so
+// process.argv[1] is the symlink while import.meta.url is the realpath.
+const entry = process.argv[1];
+if (entry && import.meta.url === pathToFileURL(realpathSync(entry)).href) {
   startMcpServer().catch((error: unknown) => {
     console.error(error);
     process.exit(1);
