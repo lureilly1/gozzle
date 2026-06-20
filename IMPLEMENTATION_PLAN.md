@@ -202,7 +202,8 @@ Deliverables:
 - Normalized local ReplacingMergeTree DDL replay, including Shared and
   Replicated family engines.
 - Streaming Parquet export/import path that does not buffer source rows in Node.
-- Credential-free slice metadata manifest with source/local proof comparison.
+- Slice metadata manifest with source/local proof comparison; it may include
+  sensitive table metadata and must be retained like the copied source data.
 - `create_local_slice` MCP tool.
 - Hard row and byte budgets controlled by `GOZZLE_MAX_SLICE_ROWS` and
   `GOZZLE_MAX_SLICE_BYTES`.
@@ -232,6 +233,16 @@ Remaining beta validation:
 
 - Run `create_local_slice` end to end against the existing ClickHouse Cloud
   `SharedReplacingMergeTree` fixture and confirm source/local proof parity.
+
+## Phase 5.1: Slice Retention and Storage Safety
+
+- Prominent production-data and retention warnings.
+- Actual recursive workspace and aggregate storage reporting.
+- Valid, corrupt, and incomplete workspace states in `gozzle slices list`.
+- Age-based cleanup and explicit invalid-workspace cleanup.
+- Aggregate storage cap through `GOZZLE_MAX_TOTAL_SLICE_BYTES`.
+- Creation output with workspace path, total usage, and cleanup command.
+- Clear concurrent-source-change guidance for proof mismatches.
 
 ## Phase 6: Migration Dry Run
 

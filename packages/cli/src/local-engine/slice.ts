@@ -1,5 +1,5 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { basename, join } from "node:path";
 
 import type {
   ClickHouseExportClient,
@@ -17,6 +17,7 @@ import {
 } from "../clickhouse/table-inspection.js";
 import type { LocalSliceConfig } from "../config/local-slice.js";
 import type { LocalEngine } from "./types.js";
+import { totalLocalSliceBytes, workspaceSize } from "./slice-store.js";
 
 export interface CreateLocalSliceOptions {
   table: string;
@@ -54,6 +55,9 @@ export interface LocalSliceResult {
   sourceProof: VerifyDedupResult;
   localProof: VerifyDedupResult;
   warnings: string[];
+  workspaceSizeBytes: number;
+  totalStorageBytes: number;
+  cleanupCommand: string;
 }
 
 interface PartitionRow {
@@ -77,8 +81,10 @@ export async function createLocalSlice(
   const partitions = await readPartitions(source, inspection);
   const partition = selectPartition(partitions, options.partitionId);
   enforceBudget(partition, config);
+  await enforceTotalStorageBudget(partition, config);
 
   await mkdir(config.rootDirectory, { recursive: true, mode: 0o700 });
+  await chmod(config.rootDirectory, 0o700);
   const workspacePath = await mkdtemp(join(config.rootDirectory, "slice-"));
   const dataPath = join(workspacePath, "data.parquet");
   const manifestPath = join(workspacePath, "manifest.json");
@@ -118,11 +124,14 @@ export async function createLocalSlice(
       partitionId: partition.partition_id
     });
     const matched = proofsMatch(sourceProof, localProof);
-    const warnings = matched
-      ? []
-      : [
-          "Source and local proof differ. The source partition may have changed during export; recreate the slice before relying on it."
-        ];
+    const warnings = [
+      "This workspace contains production data and persists until you remove it. Protect access to the slice directory and apply an appropriate retention period."
+    ];
+    if (!matched) {
+      warnings.push(
+        "Source and local proof differ. This usually means the source partition changed during export. Remove this workspace and recreate the slice before relying on it."
+      );
+    }
     const manifest: LocalSliceManifest = {
       version: 1,
       createdAt: new Date().toISOString(),
@@ -151,17 +160,42 @@ export async function createLocalSlice(
       mode: 0o600
     });
 
+    const workspaceSizeBytes = await workspaceSize(workspacePath);
+    const totalStorageBytes = await totalLocalSliceBytes(config.rootDirectory);
+    if (totalStorageBytes > config.maxTotalBytes) {
+      throw new Error(
+        `Creating this slice would use ${totalStorageBytes} bytes across local workspaces, above GOZZLE_MAX_TOTAL_SLICE_BYTES=${config.maxTotalBytes}. The new workspace was removed; run 'gozzle slices clean --older-than 7d' or raise the limit.`
+      );
+    }
+
     return {
       workspacePath,
       manifestPath,
       manifest,
       sourceProof,
       localProof,
-      warnings
+      warnings,
+      workspaceSizeBytes,
+      totalStorageBytes,
+      cleanupCommand: `gozzle slices clean ${basename(workspacePath)}`
     };
   } catch (error) {
     await rm(workspacePath, { recursive: true, force: true });
     throw error;
+  }
+}
+
+async function enforceTotalStorageBudget(
+  partition: PartitionRow,
+  config: LocalSliceConfig
+): Promise<void> {
+  const current = await totalLocalSliceBytes(config.rootDirectory);
+  const projectedSlice = toNumber(partition.bytes_on_disk) * 2;
+  const projectedTotal = current + projectedSlice;
+  if (projectedTotal > config.maxTotalBytes) {
+    throw new Error(
+      `Projected local slice storage is ${projectedTotal} bytes (${current} existing + approximately ${projectedSlice} for Parquet and chDB), above GOZZLE_MAX_TOTAL_SLICE_BYTES=${config.maxTotalBytes}. Run 'gozzle slices clean --older-than 7d' or raise the limit.`
+    );
   }
 }
 

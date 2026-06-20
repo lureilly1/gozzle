@@ -44,6 +44,11 @@ Use a read-only ClickHouse user; Gozzle does not need write access.
 
 ## Faithful Local Slices
 
+> **Production data and retention warning:** local slices contain copied source
+> rows and persist on disk until explicitly cleaned. Protect the slice directory,
+> use an appropriate retention period, and do not treat a workspace as free of
+> credentials or other sensitive values present in the source data or table DDL.
+
 `create_local_slice` copies one complete ReplacingMergeTree-family partition to
 a local chDB session through Parquet, replays a normalized local DDL, and reruns
 the duplicate proof against both source and local data. Gozzle refuses partial
@@ -56,13 +61,20 @@ are stored under `~/.gozzle/slices`:
 ```bash
 GOZZLE_MAX_SLICE_ROWS=100000
 GOZZLE_MAX_SLICE_BYTES=268435456
+GOZZLE_MAX_TOTAL_SLICE_BYTES=2147483648
 GOZZLE_SLICE_DIR=$HOME/.gozzle/slices
 ```
 
 Each workspace contains `data.parquet`, a persistent chDB database, and a
-credential-free `manifest.json`. Source and local proofs must match before
-Gozzle reports the slice as verified. Replay disables chDB's
+`manifest.json`. Source and local proofs must match before Gozzle reports the
+slice as verified. A mismatch usually means the source partition changed during
+export; remove the workspace and recreate the slice. Replay disables chDB's
 `optimize_on_insert` so ReplacingMergeTree duplicates remain visible for proof.
+
+Gozzle measures the full recursive size of every slice workspace, including
+Parquet and chDB files. Creation is refused when its projected storage would
+exceed `GOZZLE_MAX_TOTAL_SLICE_BYTES` (2 GiB by default), and the completed
+workspace is checked against the real aggregate before it is retained.
 
 List and remove persisted slices without connecting to ClickHouse:
 
@@ -70,10 +82,14 @@ List and remove persisted slices without connecting to ClickHouse:
 gozzle slices
 gozzle slices clean slice-abc123
 gozzle slices clean --all
+gozzle slices clean --older-than 7d
+gozzle slices clean --invalid
 ```
 
-Cleanup only removes direct `slice-*` workspaces containing a valid Gozzle
-manifest. A slice ID is required unless `--all` is passed.
+Listing reports valid, corrupt, and incomplete direct `slice-*` workspaces plus
+their actual size and total storage. Normal cleanup removes valid workspaces.
+Corrupt or incomplete workspaces require the explicit `--invalid` mode; cleanup
+never traverses outside direct children of the configured slice directory.
 
 ## Entry Points
 

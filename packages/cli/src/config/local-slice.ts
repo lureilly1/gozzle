@@ -5,16 +5,19 @@ export interface LocalSliceConfig {
   rootDirectory: string;
   maxRows: number;
   maxBytes: number;
+  maxTotalBytes: number;
 }
 
 export interface LocalSliceEnv {
   GOZZLE_SLICE_DIR?: string;
   GOZZLE_MAX_SLICE_ROWS?: string;
   GOZZLE_MAX_SLICE_BYTES?: string;
+  GOZZLE_MAX_TOTAL_SLICE_BYTES?: string;
 }
 
 export const DEFAULT_MAX_SLICE_ROWS = 100_000;
 export const DEFAULT_MAX_SLICE_BYTES = 256 * 1024 * 1024;
+export const DEFAULT_MAX_TOTAL_SLICE_BYTES = 2 * 1024 * 1024 * 1024;
 
 export function readLocalSliceConfig(
   env: LocalSliceEnv = process.env
@@ -29,6 +32,10 @@ export function readLocalSliceConfig(
     maxBytes: positiveInteger(
       env.GOZZLE_MAX_SLICE_BYTES,
       DEFAULT_MAX_SLICE_BYTES
+    ),
+    maxTotalBytes: positiveInteger(
+      env.GOZZLE_MAX_TOTAL_SLICE_BYTES,
+      DEFAULT_MAX_TOTAL_SLICE_BYTES
     )
   };
 }

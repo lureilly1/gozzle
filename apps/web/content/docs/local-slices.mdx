@@ -1,0 +1,159 @@
+---
+title: Faithful local slices
+description: Reproduce one complete ClickHouse partition locally with bounded storage and proof comparison
+---
+
+`create_local_slice` copies one complete `ReplacingMergeTree`-family partition
+from ClickHouse into a persistent local [chDB](https://clickhouse.com/chdb)
+workspace. Gozzle replays normalized table DDL, imports the rows through Parquet,
+and runs the same duplicate proof against the source partition and local copy.
+
+<Callout type="warn" title="Local slices contain production data">
+Slices persist until you explicitly clean them. A workspace can contain sensitive
+source rows and table metadata, including credentials or secrets stored in the
+copied data or DDL expressions. Protect the slice directory and use an appropriate
+retention period. Workspaces are not encrypted.
+</Callout>
+
+## Usage
+
+Ask your AI client:
+
+> Use Gozzle to create a local slice of partition `202606` from
+> `analytics.events`.
+
+Parameters:
+
+- `table` — `table` or `database.table`.
+- `partitionId` — the physical ClickHouse `partition_id`. It is required when
+  the table has more than one active partition.
+
+The local engine is an optional native dependency supporting Linux and macOS on
+x86_64 and arm64. If chDB is unavailable, `create_local_slice` returns a clear
+error while the rest of the MCP server continues to work.
+
+## Why Gozzle requires a complete partition
+
+ClickHouse background merges and `FINAL` deduplicate within partition scope.
+Sampling or truncating a partition can remove duplicate evidence and produce a
+misleading local result. Gozzle therefore refuses partial slices.
+
+The first version is intentionally narrow. A table must:
+
+- use `ReplacingMergeTree`, `SharedReplacingMergeTree`, or a replicated variant;
+- have a sorting key;
+- not be a `Distributed` table; and
+- fit within both the row and source-byte limits.
+
+Use `inspect_table` to see whether `create_local_slice` is eligible. For a
+`Distributed` table, select an underlying local table instead.
+
+## Proof comparison
+
+After replay, Gozzle compares duplicate groups, duplicate rows, and maximum
+copies between the source partition and local chDB database. Replay disables
+chDB's `optimize_on_insert` so insertion does not erase duplicate evidence.
+
+```text
+Verdict: verified: local duplicate proof matches the source partition.
+Source duplicate rows: 2
+Local duplicate rows: 2
+```
+
+A proof mismatch usually means the source partition changed concurrently while
+Gozzle was exporting it. Remove that workspace and recreate the slice before
+relying on it; the export and source proof are not a snapshot-atomic operation.
+
+## Storage limits
+
+Slices default to 100,000 rows and 256 MiB of source data per partition. All
+workspaces together default to a 2 GiB limit:
+
+| Variable | Default | Effect |
+| --- | ---: | --- |
+| `GOZZLE_SLICE_DIR` | `~/.gozzle/slices` | Parent directory for persistent workspaces. |
+| `GOZZLE_MAX_SLICE_ROWS` | `100000` | Maximum rows in the complete source partition. |
+| `GOZZLE_MAX_SLICE_BYTES` | `268435456` | Maximum source bytes on disk for the complete partition. |
+| `GOZZLE_MAX_TOTAL_SLICE_BYTES` | `2147483648` | Maximum storage across valid, corrupt, and incomplete workspaces. |
+
+Before export, Gozzle projects Parquet plus chDB storage at approximately twice
+the source partition's bytes on disk and refuses creation if it would exceed the
+aggregate limit. After replay it measures the real recursive workspace total.
+If the actual total exceeds the limit, the new workspace is removed and the
+operation fails cleanly.
+
+The configured slice root is restricted to mode `0700`. New Parquet files and
+manifests use mode `0600`; chDB files are protected by the workspace directory.
+
+## Listing slices
+
+`gozzle slices` and `gozzle slices list` inspect direct `slice-*` children of
+the configured directory without connecting to ClickHouse:
+
+```text
+WARNING: Local slices contain production data and persist until explicitly cleaned.
+slice-x9BWtG  valid  2026-06-20T16:44:10.275Z  analytics.events  partition=202606  size=4.5 KiB  verified
+slice-broken  corrupt  2026-06-19T10:00:00.000Z  -  partition=-  size=1.2 KiB  manifest.json does not match the supported schema
+slice-partial incomplete  2026-06-18T09:00:00.000Z  -  partition=-  size=800 B  manifest.json is missing
+Total: 6.5 KiB in 3 workspace(s)
+```
+
+States mean:
+
+- `valid` — a readable, supported manifest is present;
+- `corrupt` — the manifest is unreadable or does not match the supported schema;
+- `incomplete` — the workspace has no manifest, usually because creation did
+  not finish or another process is currently creating it.
+
+The reported size recursively includes Parquet, chDB, and manifest files. All
+three states count toward aggregate storage.
+
+## Cleaning slices
+
+Remove specific valid workspaces or all valid workspaces:
+
+```bash
+gozzle slices clean slice-x9BWtG
+gozzle slices clean --all
+```
+
+Apply a retention window to valid workspaces:
+
+```bash
+gozzle slices clean --older-than 7d
+```
+
+Corrupt and incomplete workspaces require an explicit invalid cleanup mode:
+
+```bash
+gozzle slices clean --invalid
+gozzle slices clean --invalid slice-broken
+```
+
+<Callout type="warn" title="Check incomplete workspaces before cleaning">
+An incomplete workspace may belong to a currently running slice operation. Do
+not run invalid cleanup concurrently with `create_local_slice`.
+</Callout>
+
+Cleanup only considers direct `slice-*` directories beneath
+`GOZZLE_SLICE_DIR`; it does not follow workspace names outside that directory.
+Normal cleanup cannot remove corrupt or incomplete workspaces, and invalid mode
+cannot remove a valid workspace. Each cleanup reports bytes freed and remaining
+slice storage.
+
+## Creation output
+
+A successful tool call reports the workspace and manifest paths, recursive
+workspace size, total local slice usage, and an exact cleanup command:
+
+```text
+Workspace: /Users/me/.gozzle/slices/slice-x9BWtG
+Manifest: /Users/me/.gozzle/slices/slice-x9BWtG/manifest.json
+Workspace bytes: 4821
+Total local slice storage: 10942
+Cleanup: gozzle slices clean slice-x9BWtG
+```
+
+Creation failures remove the partial workspace. Persisted incomplete states can
+still result from interruption or process termination and remain visible to
+`gozzle slices list`.

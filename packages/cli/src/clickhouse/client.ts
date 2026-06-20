@@ -81,7 +81,10 @@ export class ClickHouseHttpMetadataClient implements ClickHouseExportClient {
       }
     });
 
-    await pipeline(result.stream, createWriteStream(destination, { flags: "wx" }));
+    await pipeline(
+      result.stream,
+      createWriteStream(destination, { flags: "wx", mode: 0o600 })
+    );
     const file = await stat(destination);
     return { bytesWritten: file.size };
   }

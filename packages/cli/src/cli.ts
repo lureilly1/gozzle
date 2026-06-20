@@ -60,38 +60,78 @@ async function runSlicesCommand(args: string[]): Promise<void> {
   const action = args[0] ?? "list";
   const config = readLocalSliceConfig();
   if (action === "list") {
+    if (args.length > 1) fail(slicesUsage());
     const slices = await listLocalSlices(config.rootDirectory);
     if (slices.length === 0) {
       console.log(`No local slices in ${config.rootDirectory}`);
       return;
     }
+    console.log(
+      "WARNING: Local slices contain production data and persist until explicitly cleaned."
+    );
     for (const slice of slices) {
       const manifest = slice.manifest;
-      console.log([
-        slice.id,
-        manifest.createdAt,
-        manifest.source.table,
-        `partition=${manifest.source.partitionId}`,
-        `data=${formatBytes(manifest.local.dataBytes)}`,
-        manifest.proof.matched ? "verified" : "proof-mismatch"
-      ].join("\t"));
+      console.log(
+        [
+          slice.id,
+          slice.state,
+          manifest?.createdAt ?? slice.modifiedAt,
+          manifest?.source.table ?? "-",
+          manifest ? `partition=${manifest.source.partitionId}` : "partition=-",
+          `size=${formatBytes(slice.sizeBytes)}`,
+          manifest
+            ? manifest.proof.matched
+              ? "verified"
+              : "proof-mismatch"
+            : slice.detail ?? "-"
+        ].join("\t")
+      );
     }
+    const total = slices.reduce((bytes, slice) => bytes + slice.sizeBytes, 0);
+    console.log(`Total: ${formatBytes(total)} in ${slices.length} workspace(s)`);
     return;
   }
   if (action === "clean") {
     const targets = args.slice(1);
-    if (targets.length === 0) fail("Usage: gozzle slices clean <slice-id> [...] | --all");
-    if (targets.includes("--all") && targets.length !== 1) fail("--all cannot be combined with slice IDs.");
-    const result = await cleanLocalSlices(
-      config.rootDirectory,
-      targets[0] === "--all" ? "all" : targets
-    );
+    if (targets.length === 0) fail(slicesUsage());
+    const result = await cleanLocalSlices(config.rootDirectory, cleanOptions(targets));
     for (const slice of result.removed) console.log(`Removed ${slice.id}`);
     if (result.removed.length === 0 && result.missing.length === 0) console.log("No local slices to remove.");
-    if (result.missing.length > 0) fail(`Slice not found: ${result.missing.join(", ")}`);
+    if (result.missing.length > 0) fail(`Slice not found or cleanup mode not permitted for its state: ${result.missing.join(", ")}`);
+    const remaining = await listLocalSlices(config.rootDirectory);
+    const remainingBytes = remaining.reduce(
+      (bytes, slice) => bytes + slice.sizeBytes,
+      0
+    );
+    console.log(
+      `Freed ${formatBytes(result.bytesFreed)}; remaining ${formatBytes(remainingBytes)}`
+    );
     return;
   }
-  fail("Usage: gozzle slices [list] | clean <slice-id> [...] | clean --all");
+  fail(slicesUsage());
+}
+
+function cleanOptions(targets: string[]) {
+  if (targets[0] === "--all" && targets.length === 1) return { all: true };
+  if (targets[0] === "--invalid") {
+    if (targets.slice(1).some((target) => target.startsWith("--"))) {
+      fail(slicesUsage());
+    }
+    return { invalid: true, ids: targets.slice(1) };
+  }
+  if (targets[0] === "--older-than" && targets.length === 2) {
+    const match = /^(\d+)d$/.exec(targets[1]);
+    if (!match || Number(match[1]) < 1) {
+      fail("--older-than requires a positive whole-day duration such as 7d.");
+    }
+    return { olderThanMs: Number(match[1]) * 24 * 60 * 60 * 1000 };
+  }
+  if (targets.some((target) => target.startsWith("--"))) fail(slicesUsage());
+  return { ids: targets };
+}
+
+function slicesUsage(): string {
+  return "Usage: gozzle slices [list] | clean <slice-id> [...] | clean --all | clean --older-than 7d | clean --invalid [slice-id ...]";
 }
 
 function formatBytes(bytes: number): string {

@@ -17,7 +17,7 @@ export function createLocalSliceTool(server: McpServer): void {
     {
       title: "Create Faithful Local ClickHouse Slice",
       description:
-        "Copy one complete ReplacingMergeTree partition to a bounded local chDB workspace, replay its DDL, rerun deduplication proof, and write a manifest. Refuses partial partitions because ClickHouse deduplication is partition-scoped.",
+        "Copy one complete ReplacingMergeTree partition to a bounded local chDB workspace, replay its DDL, rerun deduplication proof, and write a manifest. The workspace contains production data and persists until explicitly cleaned. Refuses partial partitions because ClickHouse deduplication is partition-scoped.",
       inputSchema: {
         table: z
           .string()
@@ -81,6 +81,8 @@ export function formatLocalSliceResult(result: LocalSliceResult): string {
     `Rows copied: ${manifest.source.rows}`,
     `Source bytes on disk: ${manifest.source.bytesOnDisk}`,
     `Parquet bytes: ${manifest.local.dataBytes}`,
+    `Workspace bytes: ${result.workspaceSizeBytes}`,
+    `Total local slice storage: ${result.totalStorageBytes}`,
     `Local engine: ${manifest.engine}`,
     "",
     `Verdict: ${verdict}.`,
@@ -88,7 +90,8 @@ export function formatLocalSliceResult(result: LocalSliceResult): string {
     `Local duplicate rows: ${manifest.proof.localDuplicateRows}`,
     "",
     `Workspace: ${result.workspacePath}`,
-    `Manifest: ${result.manifestPath}`
+    `Manifest: ${result.manifestPath}`,
+    `Cleanup: ${result.cleanupCommand}`
   ];
   if (result.warnings.length > 0) {
     lines.push("", "Warnings:", ...result.warnings.map((item) => `- ${item}`));

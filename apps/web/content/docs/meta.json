@@ -4,6 +4,7 @@
     "index",
     "---Checks---",
     "verify-dedup",
+    "local-slices",
     "---Safety harness---",
     "read-only",
     "guardrails",
