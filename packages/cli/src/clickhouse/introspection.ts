@@ -127,10 +127,14 @@ async function readWritePrivileges(
   warnings: string[]
 ): Promise<string[]> {
   try {
+    // Privileges may be granted directly to the user or inherited via roles
+    // (the default on ClickHouse Cloud, where the admin user's grants live on
+    // `default_role`). Include both so write-capable accounts are detected.
     const rows = await client.queryJson<GrantRow>(`
       SELECT DISTINCT access_type
       FROM system.grants
       WHERE user_name = currentUser()
+        OR role_name IN (SELECT role_name FROM system.enabled_roles)
       ORDER BY access_type
     `);
 

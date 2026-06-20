@@ -118,7 +118,7 @@ export async function inspectTable(
         type,
         default_kind,
         default_expression,
-        codec_expression
+        compression_codec AS codec_expression
       FROM system.columns
       WHERE database = ${databaseLiteral}
         AND table = ${tableLiteral}
