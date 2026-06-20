@@ -168,6 +168,7 @@ test("formats table inspection output", async () => {
   assert.match(output, /Table: analytics\.events/);
   assert.match(output, /Engine: ReplacingMergeTree\(version\)/);
   assert.match(output, /verify_dedup: yes/);
+  assert.match(output, /create_local_slice: yes/);
 });
 
 test("marks Distributed tables as advisory for dedup", async () => {
@@ -202,4 +203,3 @@ test("marks Distributed tables as advisory for dedup", async () => {
   assert.equal(inspection.eligibleChecks.verifyDedup, false);
   assert.match(inspection.warnings.join("\n"), /Distributed table/);
 });
-

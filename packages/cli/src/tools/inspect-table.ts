@@ -72,6 +72,9 @@ export function formatTableInspection(inspection: TableInspection): string {
     "",
     "Eligible checks:",
     `- verify_dedup: ${inspection.eligibleChecks.verifyDedup ? "yes" : "no"}`,
+    `- create_local_slice: ${
+      inspection.eligibleChecks.createLocalSlice ? "yes" : "no"
+    }`,
     `- dry_run_migration: ${
       inspection.eligibleChecks.dryRunMigration ? "yes" : "no"
     }`,
@@ -98,4 +101,3 @@ export function formatTableInspection(inspection: TableInspection): string {
 function formatErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
-

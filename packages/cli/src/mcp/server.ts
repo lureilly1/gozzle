@@ -7,6 +7,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
 import { createConnectTool } from "../tools/connect.js";
+import { createLocalSliceTool } from "../tools/create-local-slice.js";
 import { createHealthTool } from "../tools/health.js";
 import { createInspectTableTool } from "../tools/inspect-table.js";
 import { createVerifyDedupTool } from "../tools/verify-dedup.js";
@@ -23,6 +24,7 @@ export function createGozzleMcpServer(): McpServer {
   createConnectTool(server);
   createInspectTableTool(server);
   createVerifyDedupTool(server);
+  createLocalSliceTool(server);
 
   return server;
 }

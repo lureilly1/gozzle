@@ -42,6 +42,28 @@ GOZZLE_CLICKHOUSE_DATABASE=default
 The `GOZZLE_` variables take precedence over the equivalent `CLICKHOUSE_` variables.
 Use a read-only ClickHouse user; Gozzle does not need write access.
 
+## Faithful Local Slices
+
+`create_local_slice` copies one complete ReplacingMergeTree-family partition to
+a local chDB session through Parquet, replays a normalized local DDL, and reruns
+the duplicate proof against both source and local data. Gozzle refuses partial
+partitions because ClickHouse merges and deduplicates within partition scope.
+
+If a table has multiple active partitions, pass the physical `partitionId`
+reported by ClickHouse. Slices default to 100,000 rows and 256 MiB maximum and
+are stored under `~/.gozzle/slices`:
+
+```bash
+GOZZLE_MAX_SLICE_ROWS=100000
+GOZZLE_MAX_SLICE_BYTES=268435456
+GOZZLE_SLICE_DIR=$HOME/.gozzle/slices
+```
+
+Each workspace contains `data.parquet`, a persistent chDB database, and a
+credential-free `manifest.json`. Source and local proofs must match before
+Gozzle reports the slice as verified. Replay disables chDB's
+`optimize_on_insert` so ReplacingMergeTree duplicates remain visible for proof.
+
 ## Entry Points
 
 - `gozzle`: CLI entrypoint.

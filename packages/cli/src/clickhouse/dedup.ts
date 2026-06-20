@@ -10,6 +10,8 @@ export interface VerifyDedupOptions {
   defaultDatabase: string;
   /** Maximum number of duplicated keys to return as evidence. */
   sampleLimit?: number;
+  /** Restrict proof to one physical partition, matching local slice scope. */
+  partitionId?: string;
 }
 
 export interface DedupSampleRow {
@@ -93,6 +95,9 @@ export async function verifyDedup(
   const fullTableName = formatTableIdentifier(inspection.identifier);
   const sortingKey = inspection.sortingKey;
   const sampleLimit = options.sampleLimit ?? DEFAULT_SAMPLE_LIMIT;
+  const partitionFilter = options.partitionId
+    ? `WHERE _partition_id = ${quoteStringLiteral(options.partitionId)}`
+    : "";
 
   // Background merges (and FINAL) collapse rows that share a sorting key within
   // the same partition. Grouping by `_partition_id` plus the sorting key gives
@@ -105,6 +110,7 @@ export async function verifyDedup(
     FROM (
       SELECT count() AS copies
       FROM ${fullTableName}
+      ${partitionFilter}
       GROUP BY _partition_id, ${sortingKey}
       HAVING copies > 1
     )
@@ -116,7 +122,13 @@ export async function verifyDedup(
 
   const sample =
     duplicateGroups > 0
-      ? await readSample(client, fullTableName, sortingKey, sampleLimit)
+      ? await readSample(
+          client,
+          fullTableName,
+          sortingKey,
+          sampleLimit,
+          partitionFilter
+        )
       : [];
 
   const warnings: string[] = [];
@@ -141,7 +153,8 @@ async function readSample(
   client: ClickHouseMetadataClient,
   fullTableName: string,
   sortingKey: string,
-  sampleLimit: number
+  sampleLimit: number,
+  partitionFilter: string
 ): Promise<DedupSampleRow[]> {
   const rows = await client.queryJson<Record<string, unknown>>(`
     SELECT
@@ -149,6 +162,7 @@ async function readSample(
       ${sortingKey},
       count() AS _copies
     FROM ${fullTableName}
+    ${partitionFilter}
     GROUP BY _partition_id, ${sortingKey}
     HAVING _copies > 1
     ORDER BY _copies DESC
@@ -163,6 +177,10 @@ async function readSample(
       copies: toNumber((_copies as string | number) ?? 0)
     };
   });
+}
+
+function quoteStringLiteral(value: string): string {
+  return `'${value.replaceAll("\\", "\\\\").replaceAll("'", "\\'")}'`;
 }
 
 function toNumber(value: string | number): number {

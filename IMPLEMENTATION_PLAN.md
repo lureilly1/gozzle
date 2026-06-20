@@ -10,6 +10,19 @@ The practical implementation stance is:
 
 > Gozzle is a ClickHouse developer toolkit that AI agents can use well. The AI reasons; Gozzle runs checks and produces proof.
 
+The product boundary versus the official ClickHouse MCP is deliberate:
+
+> The official ClickHouse MCP is a query gateway. Gozzle is a safety harness: it runs bounded checks and returns verdicts with proof.
+
+## Current Progress
+
+- Phase 1: complete.
+- Phase 2: complete, including enforced read-only execution and query guardrails.
+- Phase 3: complete.
+- Phase 4: complete and verified against ClickHouse Cloud `SharedReplacingMergeTree`.
+- Phase 5: complete for bounded, single-partition ReplacingMergeTree slices using chDB.
+- Next user-facing tool: Phase 6, `dry_run_migration`.
+
 ## Phase 0: Product Narrowing
 
 Goal: lock the MVP around a small ClickHouse developer toolkit, not the full platform.
@@ -79,7 +92,7 @@ Success criteria:
 - MCP server starts over stdio.
 - A dummy MCP tool can be called from a local test script.
 
-## Phase 2: ClickHouse Connection Layer
+## Phase 2: ClickHouse Connection Layer (Complete)
 
 Goal: connect safely to a real ClickHouse cluster.
 
@@ -91,7 +104,10 @@ Deliverables:
 - Cloud vs self-hosted detection.
 - Version detection.
 - Basic permission inspection.
-- Read-only guardrail warnings.
+- Read-only enforcement for every query using `readonly=2`, independent of the configured account's grants.
+- `GOZZLE_ENFORCE_READONLY` override for explicit local debugging.
+- Per-query guardrails: `max_execution_time`, `max_result_rows`, and optional `max_rows_to_read` and `max_bytes_to_read`.
+- Connection output reports active enforcement rather than stale account privilege warnings.
 
 The product should aggressively communicate:
 
@@ -105,7 +121,8 @@ Success criteria:
 - Can connect to local or remote ClickHouse.
 - Can run metadata queries.
 - Fails clearly on bad credentials.
-- Warns if the user appears to have unnecessary write privileges.
+- Every query is forced read-only by default, even when the account has write privileges.
+- Expensive or unexpectedly large model-initiated queries are bounded.
 
 ## Phase 3: Schema and Layout Inspection
 
@@ -133,22 +150,22 @@ Success criteria:
 - It can identify whether the table is a `ReplacingMergeTree`.
 - It can tell whether the table is eligible for `verify_dedup`.
 
-## Phase 4: First Hero Tool, `verify_dedup`
+## Phase 4: First Hero Tool, `verify_dedup` (Complete)
 
 Goal: produce the first proof moment.
 
 Deliverables:
 
-- `verify_dedup({ table, query? })`.
-- Detect duplicate exposure in `ReplacingMergeTree` tables.
-- Compare current results against `FINAL` semantics.
+- `verify_dedup({ table, sampleLimit? })`.
+- Detect duplicate exposure in `ReplacingMergeTree`-family tables.
+- Count rows by `(_partition_id, sorting key)`, matching the scope within which ClickHouse merges and `FINAL` collapse rows.
 - Return:
   - duplicate row count
   - affected key count
   - sample affected keys
-  - whether duplicates cross partitions
-  - whether distributed topology makes the result advisory
-  - suggested next query pattern
+  - a clear verdict with supporting evidence
+- Refuse unsupported engines and direct Distributed tables to their underlying local tables.
+- Record an audit entry for the check.
 
 Initial implementation can run against production read-only first. The local slice can come later. That gives faster validation.
 
@@ -172,27 +189,35 @@ Success criteria:
 - Finds real duplicate exposure on test fixtures.
 - Produces a result a ClickHouse developer immediately understands.
 - Refuses unsupported engines cleanly.
+- Verified live against a ClickHouse Cloud `SharedReplacingMergeTree` table.
 
-## Phase 5: Local Reproduction Substrate
+## Phase 5: Local Reproduction Substrate (Complete)
 
 Goal: introduce the faithful local slice after the first tool has value.
 
 Deliverables:
 
-- Local engine abstraction.
-- First backend: `clickhouse-local` or chDB.
-- Temporary local workspace management.
-- DDL replay locally.
-- Parquet export/import path.
-- Slice metadata manifest.
+- Local engine abstraction with chDB as the first backend.
+- Persistent local workspace management under `~/.gozzle/slices` by default.
+- Normalized local ReplacingMergeTree DDL replay, including Shared and
+  Replicated family engines.
+- Streaming Parquet export/import path that does not buffer source rows in Node.
+- Credential-free slice metadata manifest with source/local proof comparison.
+- `create_local_slice` MCP tool.
+- Hard row and byte budgets controlled by `GOZZLE_MAX_SLICE_ROWS` and
+  `GOZZLE_MAX_SLICE_BYTES`.
+- Complete-partition requirement: Gozzle refuses partial data because merges
+  and `FINAL` deduplicate within partition scope.
+- chDB replay with `optimize_on_insert=0` so import does not erase duplicate
+  evidence before verification.
 
 Start narrow:
 
 - Single table.
-- `ReplacingMergeTree`.
-- Selected partitions.
-- Limited column set.
-- Size budget.
+- `ReplacingMergeTree` family.
+- One complete selected partition.
+- Insertable source columns.
+- 100,000 rows and 256 MiB by default.
 
 Success criteria:
 
@@ -200,6 +225,13 @@ Success criteria:
 - Can recreate table DDL locally.
 - Can run the same duplicate check locally.
 - Results match production for fixture datasets.
+- Embedded chDB integration test proves Parquet replay preserves and detects
+  ReplacingMergeTree duplicates.
+
+Remaining beta validation:
+
+- Run `create_local_slice` end to end against the existing ClickHouse Cloud
+  `SharedReplacingMergeTree` fixture and confirm source/local proof parity.
 
 ## Phase 6: Migration Dry Run
 

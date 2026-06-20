@@ -23,6 +23,9 @@ try {
   const hasVerifyDedupTool = tools.tools.some(
     (tool) => tool.name === "verify_dedup"
   );
+  const hasCreateLocalSliceTool = tools.tools.some(
+    (tool) => tool.name === "create_local_slice"
+  );
 
   if (!hasHealthTool) {
     throw new Error("Expected MCP server to expose a health tool.");
@@ -38,6 +41,10 @@ try {
 
   if (!hasVerifyDedupTool) {
     throw new Error("Expected MCP server to expose a verify_dedup tool.");
+  }
+
+  if (!hasCreateLocalSliceTool) {
+    throw new Error("Expected MCP server to expose a create_local_slice tool.");
   }
 
   const result = await client.callTool({

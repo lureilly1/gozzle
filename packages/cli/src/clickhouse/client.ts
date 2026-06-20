@@ -1,4 +1,7 @@
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
+import { createWriteStream } from "node:fs";
+import { stat } from "node:fs/promises";
+import { pipeline } from "node:stream/promises";
 
 import type { ClickHouseConnectionConfig } from "../config/clickhouse.js";
 import {
@@ -13,7 +16,20 @@ export interface ClickHouseMetadataClient {
   close(): Promise<void>;
 }
 
-export class ClickHouseHttpMetadataClient implements ClickHouseMetadataClient {
+export interface ExportLimits {
+  maxRows: number;
+  maxBytes: number;
+}
+
+export interface ClickHouseExportClient extends ClickHouseMetadataClient {
+  exportParquet(
+    query: string,
+    destination: string,
+    limits: ExportLimits
+  ): Promise<{ bytesWritten: number }>;
+}
+
+export class ClickHouseHttpMetadataClient implements ClickHouseExportClient {
   private readonly client: ClickHouseClient;
   private readonly settings: Record<string, string>;
 
@@ -45,6 +61,29 @@ export class ClickHouseHttpMetadataClient implements ClickHouseMetadataClient {
     });
 
     return (await resultSet.json()) as T[];
+  }
+
+  async exportParquet(
+    query: string,
+    destination: string,
+    limits: ExportLimits
+  ): Promise<{ bytesWritten: number }> {
+    const normalizedQuery = query.trim().replace(/;$/, "");
+    const result = await this.client.exec({
+      query: `${normalizedQuery}\nFORMAT Parquet`,
+      clickhouse_settings: {
+        ...this.settings,
+        max_result_rows: String(limits.maxRows),
+        result_overflow_mode: "throw",
+        max_rows_to_read: String(limits.maxRows),
+        max_bytes_to_read: String(limits.maxBytes),
+        read_overflow_mode: "throw"
+      }
+    });
+
+    await pipeline(result.stream, createWriteStream(destination, { flags: "wx" }));
+    const file = await stat(destination);
+    return { bytesWritten: file.size };
   }
 
   async close(): Promise<void> {

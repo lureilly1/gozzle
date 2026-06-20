@@ -49,6 +49,7 @@ export interface TableInspection {
   parts: TablePartsSummary;
   eligibleChecks: {
     verifyDedup: boolean;
+    createLocalSlice: boolean;
     dryRunMigration: boolean;
     diagnoseQuery: boolean;
   };
@@ -177,6 +178,7 @@ export async function inspectTable(
     },
     eligibleChecks: {
       verifyDedup: isReplacingMergeTree && !isDistributed,
+      createLocalSlice: isReplacingMergeTree && !isDistributed,
       dryRunMigration: true,
       diagnoseQuery: true
     },
