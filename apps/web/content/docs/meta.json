@@ -1,0 +1,12 @@
+{
+  "title": "Documentation",
+  "pages": [
+    "index",
+    "---Checks---",
+    "verify-dedup",
+    "---Safety harness---",
+    "read-only",
+    "guardrails",
+    "audit-log"
+  ]
+}

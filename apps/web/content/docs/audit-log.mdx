@@ -1,0 +1,56 @@
+---
+title: Audit log
+description: Optionally record every Gozzle tool call to a local file for review
+---
+
+Gozzle can keep a local, append-only record of every tool call it handles. The
+audit log is **opt-in and local** — nothing leaves your machine — so you can
+review exactly what the AI client asked Gozzle to do.
+
+## Enabling
+
+Set `GOZZLE_AUDIT_LOG` to a writable file path:
+
+```json
+{
+  "mcpServers": {
+    "gozzle": {
+      "command": "gozzle-mcp",
+      "env": {
+        "GOZZLE_AUDIT_LOG": "/Users/me/.gozzle/audit.log"
+      }
+    }
+  }
+}
+```
+
+When the variable is unset, auditing is off and has no effect.
+
+## Format
+
+One JSON object per line (JSON Lines), one line per tool call:
+
+```json
+{"timestamp":"2026-06-20T10:19:53.920Z","tool":"health","arguments":{},"outcome":"ok","durationMs":1,"summary":"Gozzle MCP server is running."}
+{"timestamp":"2026-06-20T10:19:54.155Z","tool":"inspect_table","arguments":{"table":"nyc_taxi.trips"},"outcome":"ok","durationMs":232,"summary":"Table: nyc_taxi.trips"}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `timestamp` | ISO-8601 time the call completed. |
+| `tool` | Tool name (`health`, `connect`, `inspect_table`, `verify_dedup`). |
+| `arguments` | Arguments the tool was called with. |
+| `outcome` | `ok` or `error`. |
+| `durationMs` | Wall-clock duration. |
+| `summary` | First line of the tool's output. |
+
+Tail it while you work:
+
+```bash
+tail -f ~/.gozzle/audit.log
+```
+
+<Callout title="Logging never breaks a tool">
+Audit writes are best-effort. If the log path is not writable, the tool call
+still succeeds — the entry is simply skipped.
+</Callout>

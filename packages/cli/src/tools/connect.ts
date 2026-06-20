@@ -3,6 +3,8 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ClickHouseHttpMetadataClient } from "../clickhouse/client.js";
 import { inspectClickHouseConnection } from "../clickhouse/introspection.js";
 import { readClickHouseConfig } from "../config/clickhouse.js";
+import { readGuardrailConfig } from "../config/guardrails.js";
+import { runAuditedTool } from "../shared/audit.js";
 
 export function createConnectTool(server: McpServer): void {
   server.registerTool(
@@ -13,38 +15,44 @@ export function createConnectTool(server: McpServer): void {
         "Validate the configured ClickHouse connection and report read-only guardrails.",
       inputSchema: {}
     },
-    async () => {
-      let client: ClickHouseHttpMetadataClient | undefined;
+    async () =>
+      runAuditedTool("connect", {}, async () => {
+        let client: ClickHouseHttpMetadataClient | undefined;
 
-      try {
-        const config = readClickHouseConfig();
-        client = new ClickHouseHttpMetadataClient(config);
-        const info = await inspectClickHouseConnection(client, config);
+        try {
+          const config = readClickHouseConfig();
+          const guardrails = readGuardrailConfig();
+          client = new ClickHouseHttpMetadataClient(config, guardrails);
+          const info = await inspectClickHouseConnection(
+            client,
+            config,
+            guardrails
+          );
 
-        return {
-          content: [
-            {
-              type: "text",
-              text: formatConnectionInfo(info)
-            }
-          ]
-        };
-      } catch (error) {
-        return {
-          isError: true,
-          content: [
-            {
-              type: "text",
-              text: `Gozzle could not connect to ClickHouse.\n\n${formatErrorMessage(
-                error
-              )}`
-            }
-          ]
-        };
-      } finally {
-        await client?.close();
-      }
-    }
+          return {
+            content: [
+              {
+                type: "text",
+                text: formatConnectionInfo(info)
+              }
+            ]
+          };
+        } catch (error) {
+          return {
+            isError: true,
+            content: [
+              {
+                type: "text",
+                text: `Gozzle could not connect to ClickHouse.\n\n${formatErrorMessage(
+                  error
+                )}`
+              }
+            ]
+          };
+        } finally {
+          await client?.close();
+        }
+      })
   );
 }
 
@@ -60,11 +68,12 @@ function formatConnectionInfo(info: ConnectionInfo): string {
     `User: ${info.currentUser}`,
     `Host: ${info.hostName}`,
     `Deployment: ${info.deployment}`,
-    `Readonly setting: ${info.readonlySetting ?? "unknown"}`
+    `Read-only enforced by Gozzle: ${info.readonlyEnforced ? "yes (readonly=2)" : "no"}`,
+    `Effective readonly setting: ${info.effectiveReadonly ?? "unknown"}`
   ];
 
   if (info.writePrivileges.length > 0) {
-    lines.push(`Write-capable grants: ${info.writePrivileges.join(", ")}`);
+    lines.push(`Account write-capable grants: ${info.writePrivileges.join(", ")}`);
   }
 
   if (info.warnings.length > 0) {

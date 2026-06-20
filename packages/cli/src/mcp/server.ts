@@ -9,6 +9,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { createConnectTool } from "../tools/connect.js";
 import { createHealthTool } from "../tools/health.js";
 import { createInspectTableTool } from "../tools/inspect-table.js";
+import { createVerifyDedupTool } from "../tools/verify-dedup.js";
 import { readPackageMetadata } from "../shared/package-metadata.js";
 
 export function createGozzleMcpServer(): McpServer {
@@ -21,6 +22,7 @@ export function createGozzleMcpServer(): McpServer {
   createHealthTool(server);
   createConnectTool(server);
   createInspectTableTool(server);
+  createVerifyDedupTool(server);
 
   return server;
 }

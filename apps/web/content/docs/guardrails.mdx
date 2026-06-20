@@ -1,0 +1,46 @@
+---
+title: Cost & row guardrails
+description: Every Gozzle query is bounded so the model cannot trigger a runaway
+---
+
+Beyond [read-only enforcement](/docs/read-only), Gozzle applies cost guardrails
+to every statement so an AI client cannot accidentally launch an expensive or
+runaway query. The guardrails are ClickHouse session settings applied at the
+connection layer.
+
+## Defaults
+
+| Variable | Default | ClickHouse setting | Effect |
+| --- | --- | --- | --- |
+| `GOZZLE_MAX_EXECUTION_TIME` | `30` | `max_execution_time` | Hard wall-clock cap per query, in seconds. |
+| `GOZZLE_MAX_RESULT_ROWS` | `10000` | `max_result_rows` (`result_overflow_mode=throw`) | Cap rows returned to Gozzle. Gozzle only needs verdicts, never bulk rows. |
+| `GOZZLE_MAX_ROWS_TO_READ` | `0` (off) | `max_rows_to_read` (`read_overflow_mode=throw`) | Abort a query that would read more than N rows. |
+| `GOZZLE_MAX_BYTES_TO_READ` | `0` (off) | `max_bytes_to_read` (`read_overflow_mode=throw`) | Abort a query that would read more than N bytes. |
+
+Set any value to `0` to disable that guardrail. Read caps are off by default
+because some checks (such as [`verify_dedup`](/docs/verify-dedup)) intentionally
+scan a full table; `max_execution_time` is the universal safety net.
+
+## When a guardrail fires
+
+The query is aborted by ClickHouse and the tool returns a clear error instead of
+crashing. For example, inspecting a wide table with `GOZZLE_MAX_RESULT_ROWS=1`:
+
+```text
+Gozzle could not inspect the table.
+
+Limit for result exceeded, max rows: 1.00, current rows: 18.00.
+```
+
+## Tightening for large clusters
+
+To make Gozzle refuse heavy scans entirely, set explicit read caps:
+
+```json
+{
+  "env": {
+    "GOZZLE_MAX_EXECUTION_TIME": "15",
+    "GOZZLE_MAX_BYTES_TO_READ": "5000000000"
+  }
+}
+```

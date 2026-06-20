@@ -230,14 +230,18 @@ function parseReplacingMergeTreeDetails(
     return {};
   }
 
-  const args = match[1]
+  // Replicated/Shared variants prefix the args with a keeper path and replica
+  // name, which are string literals. The optional version and is_deleted
+  // columns are bare identifiers, so drop the quoted literals to find them.
+  const columnArgs = match[1]
     .split(",")
     .map((arg) => arg.trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    .filter((arg) => !/^['"]/.test(arg));
 
   return {
-    versionColumn: args[0],
-    deletedColumn: args[1]
+    versionColumn: columnArgs[0],
+    deletedColumn: columnArgs[1]
   };
 }
 

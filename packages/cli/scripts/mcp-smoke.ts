@@ -20,6 +20,9 @@ try {
   const hasInspectTableTool = tools.tools.some(
     (tool) => tool.name === "inspect_table"
   );
+  const hasVerifyDedupTool = tools.tools.some(
+    (tool) => tool.name === "verify_dedup"
+  );
 
   if (!hasHealthTool) {
     throw new Error("Expected MCP server to expose a health tool.");
@@ -31,6 +34,10 @@ try {
 
   if (!hasInspectTableTool) {
     throw new Error("Expected MCP server to expose an inspect_table tool.");
+  }
+
+  if (!hasVerifyDedupTool) {
+    throw new Error("Expected MCP server to expose a verify_dedup tool.");
   }
 
   const result = await client.callTool({

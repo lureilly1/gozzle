@@ -1,0 +1,63 @@
+---
+title: verify_dedup
+description: Prove whether a ReplacingMergeTree table currently holds duplicate rows
+---
+
+`ReplacingMergeTree` (and its `Shared`/`Replicated` variants) deduplicates rows
+with the same sorting key **lazily** — during background merges, per partition.
+Until a merge runs, duplicates are still physically present, so a plain
+`SELECT count()` is misleading and `SELECT ... FINAL` hides the problem.
+
+`verify_dedup` returns a **verdict plus evidence**: how many rows a merge or
+`FINAL` would collapse, and a sample of the worst-offending keys.
+
+## Usage
+
+Ask your AI client:
+
+> Use Gozzle to verify deduplication on `analytics.events`.
+
+Parameters:
+
+- `table` — `table` or `database.table`.
+- `sampleLimit` — how many duplicated keys to return as evidence (default `5`, max `50`).
+
+## Example output
+
+```text
+Table: analytics.events
+Engine: SharedReplacingMergeTree
+Dedup key (ORDER BY): id
+Partitioned: no
+Total rows: 7
+
+Verdict: 3 duplicate row(s) across 2 sorting-key group(s) would be collapsed by a merge or FINAL.
+Most-duplicated key has 3 copies.
+
+Sample duplicated keys:
+- [partition all] id=1 -> 3 copies
+- [partition all] id=2 -> 2 copies
+```
+
+## How it works
+
+Gozzle groups rows by `_partition_id` together with the table's sorting key —
+exactly the scope ClickHouse uses when it merges. Duplicates are counted as
+`rows − distinct (partition, sorting key) groups`.
+
+<Callout title="Per-partition by design">
+Background merges and `FINAL` only collapse duplicates **within a partition**.
+Identical sorting keys in different partitions are never merged, so Gozzle counts
+them per partition and says so in the output when the table is partitioned.
+</Callout>
+
+## Eligibility
+
+`verify_dedup` runs only when `inspect_table` reports it as eligible:
+
+- the engine is a `ReplacingMergeTree` family engine, and
+- the table is not `Distributed` (run it against the local table on each shard), and
+- the table has a sorting key.
+
+For ineligible tables, Gozzle returns a clear reason instead of a misleading
+count.

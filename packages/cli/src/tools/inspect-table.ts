@@ -4,6 +4,7 @@ import { z } from "zod";
 import { ClickHouseHttpMetadataClient } from "../clickhouse/client.js";
 import { inspectTable, type TableInspection } from "../clickhouse/table-inspection.js";
 import { readClickHouseConfig } from "../config/clickhouse.js";
+import { runAuditedTool } from "../shared/audit.js";
 
 export function createInspectTableTool(server: McpServer): void {
   server.registerTool(
@@ -19,41 +20,42 @@ export function createInspectTableTool(server: McpServer): void {
           .describe("Table name in table or database.table format.")
       }
     },
-    async ({ table }) => {
-      let client: ClickHouseHttpMetadataClient | undefined;
+    async ({ table }) =>
+      runAuditedTool("inspect_table", { table }, async () => {
+        let client: ClickHouseHttpMetadataClient | undefined;
 
-      try {
-        const config = readClickHouseConfig();
-        client = new ClickHouseHttpMetadataClient(config);
-        const inspection = await inspectTable(client, {
-          table,
-          defaultDatabase: config.database ?? "default"
-        });
+        try {
+          const config = readClickHouseConfig();
+          client = new ClickHouseHttpMetadataClient(config);
+          const inspection = await inspectTable(client, {
+            table,
+            defaultDatabase: config.database ?? "default"
+          });
 
-        return {
-          content: [
-            {
-              type: "text",
-              text: formatTableInspection(inspection)
-            }
-          ]
-        };
-      } catch (error) {
-        return {
-          isError: true,
-          content: [
-            {
-              type: "text",
-              text: `Gozzle could not inspect the table.\n\n${formatErrorMessage(
-                error
-              )}`
-            }
-          ]
-        };
-      } finally {
-        await client?.close();
-      }
-    }
+          return {
+            content: [
+              {
+                type: "text",
+                text: formatTableInspection(inspection)
+              }
+            ]
+          };
+        } catch (error) {
+          return {
+            isError: true,
+            content: [
+              {
+                type: "text",
+                text: `Gozzle could not inspect the table.\n\n${formatErrorMessage(
+                  error
+                )}`
+              }
+            ]
+          };
+        } finally {
+          await client?.close();
+        }
+      })
   );
 }
 

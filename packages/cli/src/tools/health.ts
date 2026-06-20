@@ -1,5 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
+import { runAuditedTool } from "../shared/audit.js";
+
 export function createHealthTool(server: McpServer): void {
   server.registerTool(
     "health",
@@ -8,14 +10,15 @@ export function createHealthTool(server: McpServer): void {
       description: "Confirm the Gozzle MCP server is running.",
       inputSchema: {}
     },
-    async () => ({
-      content: [
-        {
-          type: "text",
-          text: "Gozzle MCP server is running."
-        }
-      ]
-    })
+    async () =>
+      runAuditedTool("health", {}, async () => ({
+        content: [
+          {
+            type: "text",
+            text: "Gozzle MCP server is running."
+          }
+        ]
+      }))
   );
 }
 

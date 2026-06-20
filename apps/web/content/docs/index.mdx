@@ -3,15 +3,40 @@ title: Introduction
 description: A local safety harness and developer toolkit for ClickHouse
 ---
 
-Welcome to the **Gozzle** documentation. This is a placeholder site — real
-content lives alongside the code in `apps/web/content/docs`.
+**Gozzle** is a local safety harness for ClickHouse, exposed to your AI client
+over [MCP](https://modelcontextprotocol.io). The AI reasons; Gozzle runs bounded
+checks and returns **verdicts plus proof** — it never hands raw query power to
+the model.
 
-Gozzle ships as a CLI and an MCP server (`@gozzle/cli`) that act as a safety
-harness around your local ClickHouse instance.
+Gozzle ships as `@gozzle/cli`, which provides a `gozzle` CLI and a `gozzle-mcp`
+stdio server.
 
-## Next steps
+## How it differs from the official ClickHouse MCP
 
-<Cards>
-  <Card title="gozzle on npm" href="https://www.npmjs.com/package/@gozzle/cli" />
-  <Card title="Learn more about Fumadocs" href="https://fumadocs.dev" />
-</Cards>
+The official ClickHouse MCP is a query gateway: it lets the model run SELECTs and
+returns rows. Gozzle is the opposite — a **safety harness**:
+
+- Every query runs **read-only by construction** ([read-only enforcement](/docs/read-only)).
+- Every query is **bounded** so the model can't trigger a runaway ([cost & row guardrails](/docs/guardrails)).
+- Checks return **ClickHouse-aware verdicts** the model can't compute from raw
+  rows, like [`verify_dedup`](/docs/verify-dedup).
+- Every call can be **recorded locally** for review ([audit log](/docs/audit-log)).
+
+## Tools
+
+| Tool | What it does |
+| --- | --- |
+| `health` | Confirm the Gozzle MCP server is running. |
+| `connect` | Validate the connection and report read-only guardrails and account privileges. |
+| `inspect_table` | Report a table's physical layout, parts, keys, and eligible checks. |
+| [`verify_dedup`](/docs/verify-dedup) | Prove whether a ReplacingMergeTree table currently holds duplicate rows by sorting key. |
+
+## Install
+
+```bash
+npm install -g @gozzle/cli@canary
+gozzle init
+```
+
+Add the printed config to Claude, Cursor, Codex, or another MCP host. Use a
+read-only ClickHouse user.

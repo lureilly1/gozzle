@@ -1,0 +1,50 @@
+---
+title: Read-only enforcement
+description: Gozzle forces a read-only session so no statement can ever write
+---
+
+Gozzle is a safety harness, not a query client. To make that guarantee real
+rather than aspirational, every statement Gozzle issues runs with the ClickHouse
+session setting **`readonly = 2`**. Under `readonly = 2` ClickHouse permits
+`SELECT`/`SHOW` and per-query settings, but rejects all writes and DDL — so even
+a future bug or a crafted input cannot mutate your data through Gozzle.
+
+This is enforced by construction at the connection layer, independently of the
+privileges the connected account happens to hold.
+
+## Verifying it
+
+`connect` reports the enforcement status and the effective setting observed on
+the live connection:
+
+```text
+Read-only enforced by Gozzle: yes (readonly=2)
+Effective readonly setting: 2
+```
+
+`connect` also inspects the account's grants — including those inherited via
+roles (the default on ClickHouse Cloud, where privileges live on
+`default_role`) — and warns when the account is write-capable:
+
+```text
+Account write-capable grants: INSERT, ALTER, TRUNCATE, OPTIMIZE, KILL QUERY
+...
+Warnings:
+- Account has write-capable grants: INSERT, ALTER, TRUNCATE, OPTIMIZE, KILL QUERY.
+  Gozzle never writes, but a least-privilege read-only user is recommended.
+```
+
+Gozzle never needs write access. Pair read-only enforcement with a dedicated
+read-only ClickHouse user for defense in depth.
+
+## Configuration
+
+| Variable | Default | Effect |
+| --- | --- | --- |
+| `GOZZLE_ENFORCE_READONLY` | `true` | Set to `false` to disable `readonly=2` enforcement. `connect` then warns that enforcement is off. |
+
+<Callout type="warn">
+Disabling read-only enforcement removes Gozzle's core safety guarantee. Only do
+this if another mechanism (such as a strictly read-only account) protects the
+cluster.
+</Callout>

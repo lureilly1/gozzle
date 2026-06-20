@@ -1,4 +1,8 @@
 import type { ClickHouseConnectionConfig } from "../config/clickhouse.js";
+import {
+  DEFAULT_GUARDRAILS,
+  type GuardrailConfig
+} from "../config/guardrails.js";
 import type { ClickHouseMetadataClient } from "./client.js";
 
 export interface ClickHouseConnectionInfo {
@@ -8,7 +12,10 @@ export interface ClickHouseConnectionInfo {
   currentUser: string;
   hostName: string;
   deployment: "cloud" | "self_hosted_or_unknown";
-  readonlySetting?: string;
+  /** Whether Gozzle enforces a read-only session on every query. */
+  readonlyEnforced: boolean;
+  /** Effective `readonly` value observed on the connection (proof). */
+  effectiveReadonly?: string;
   writePrivileges: string[];
   warnings: string[];
 }
@@ -41,7 +48,8 @@ const WRITE_PRIVILEGES = new Set([
 
 export async function inspectClickHouseConnection(
   client: ClickHouseMetadataClient,
-  config: ClickHouseConnectionConfig
+  config: ClickHouseConnectionConfig,
+  guardrails: GuardrailConfig = DEFAULT_GUARDRAILS
 ): Promise<ClickHouseConnectionInfo> {
   const pingOk = await client.ping();
 
@@ -62,20 +70,20 @@ export async function inspectClickHouseConnection(
   }
 
   const warnings: string[] = [];
-  const readonlySetting = await readReadonlySetting(client, warnings);
+  const effectiveReadonly = await readReadonlySetting(client, warnings);
   const writePrivileges = await readWritePrivileges(client, warnings);
 
-  if (readonlySetting !== undefined && readonlySetting !== "1") {
+  if (!guardrails.enforceReadonly) {
     warnings.push(
-      "Session readonly setting is not enabled. Use a read-only ClickHouse user for Gozzle."
+      "Gozzle read-only enforcement is disabled (GOZZLE_ENFORCE_READONLY=false). Queries are not forced read-only."
     );
   }
 
   if (writePrivileges.length > 0) {
     warnings.push(
-      `Connected user appears to have write-capable grants: ${writePrivileges.join(
+      `Connected user has write-capable grants: ${writePrivileges.join(
         ", "
-      )}. Gozzle only needs read-only access.`
+      )}. Gozzle never writes, but a least-privilege read-only user is recommended.`
     );
   }
 
@@ -86,7 +94,8 @@ export async function inspectClickHouseConnection(
     currentUser: serverInfo.current_user,
     hostName: serverInfo.host_name,
     deployment: detectDeployment(config.url),
-    readonlySetting,
+    readonlyEnforced: guardrails.enforceReadonly,
+    effectiveReadonly,
     writePrivileges,
     warnings
   };

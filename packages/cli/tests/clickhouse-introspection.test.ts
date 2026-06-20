@@ -50,7 +50,7 @@ test("detects ClickHouse Cloud from hostname", () => {
 test("inspects connection metadata and warns on write grants", async () => {
   const client = new FakeMetadataClient({
     "version()": [serverInfo],
-    "system.settings": [{ value: "0" }],
+    "system.settings": [{ value: "2" }],
     "system.grants": [
       { access_type: "SELECT" },
       { access_type: "INSERT" },
@@ -67,9 +67,40 @@ test("inspects connection metadata and warns on write grants", async () => {
   assert.equal(info.connected, true);
   assert.equal(info.deployment, "cloud");
   assert.equal(info.version, "25.6.1.1");
+  assert.equal(info.readonlyEnforced, true);
+  assert.equal(info.effectiveReadonly, "2");
   assert.deepEqual(info.writePrivileges, ["INSERT", "ALTER"]);
-  assert.match(info.warnings.join("\n"), /Session readonly setting is not enabled/);
+  // Default guardrails enforce read-only, so there is no "enforcement disabled"
+  // warning, but the over-privileged account is still flagged.
+  assert.doesNotMatch(info.warnings.join("\n"), /enforcement is disabled/);
   assert.match(info.warnings.join("\n"), /write-capable grants/);
+});
+
+test("warns when read-only enforcement is disabled", async () => {
+  const client = new FakeMetadataClient({
+    "version()": [serverInfo],
+    "system.settings": [{ value: "0" }],
+    "system.grants": []
+  });
+
+  const info = await inspectClickHouseConnection(
+    client,
+    {
+      url: "http://localhost:8123",
+      username: "default",
+      password: ""
+    },
+    {
+      enforceReadonly: false,
+      maxExecutionTimeSeconds: 0,
+      maxResultRows: 0,
+      maxRowsToRead: 0,
+      maxBytesToRead: 0
+    }
+  );
+
+  assert.equal(info.readonlyEnforced, false);
+  assert.match(info.warnings.join("\n"), /enforcement is disabled/);
 });
 
 test("continues when readonly and grant inspection are unavailable", async () => {
@@ -87,7 +118,7 @@ test("continues when readonly and grant inspection are unavailable", async () =>
   });
 
   assert.equal(info.connected, true);
-  assert.equal(info.readonlySetting, undefined);
+  assert.equal(info.effectiveReadonly, undefined);
   assert.deepEqual(info.writePrivileges, []);
   assert.match(info.warnings.join("\n"), /Could not inspect readonly setting/);
   assert.match(info.warnings.join("\n"), /Could not inspect grants/);
