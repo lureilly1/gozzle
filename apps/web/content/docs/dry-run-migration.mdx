@@ -1,0 +1,122 @@
+---
+title: Migration dry runs
+description: Classify ClickHouse ALTER statements and estimate their physical rewrite cost without executing them
+---
+
+`dry_run_migration` accepts one `ALTER TABLE` statement, classifies its risk,
+and estimates affected rows, active parts, and compressed bytes. Gozzle never
+executes the proposed `ALTER` on production.
+
+## Usage
+
+Ask your AI client:
+
+> Use Gozzle to dry-run `ALTER TABLE analytics.events DELETE WHERE tenant_id = 42`.
+
+The tool accepts one parameter:
+
+- `statement` — exactly one unquoted-table `ALTER TABLE` statement.
+
+SQL comments, multiple statements, quoted table identifiers, compound ALTER
+commands, and unfamiliar operations are rejected or reported as unsupported
+rather than assigned a speculative safety verdict.
+
+## Classifications
+
+| Classification | Meaning |
+| --- | --- |
+| `metadata-only` | No existing data-part rewrite is expected, although the visible schema can change immediately. |
+| `part-rewriting` | Existing parts may be rewritten by a mutation, TTL operation, materialization, or column change. |
+| `risky-materialized-column` | Materialized-column behavior requires additional care even when the initial schema change is metadata-only. |
+| `unsupported` | Gozzle cannot make a defensible cost or safety claim for the statement. |
+
+Examples of metadata-only operations include adding, dropping, renaming, and
+commenting on columns; adding or dropping indexes, projections, or constraints;
+and changing supported table metadata settings. Gozzle conservatively treats
+`MODIFY COLUMN`, TTL changes, materialization, and `CLEAR COLUMN` as potential
+part rewrites.
+
+## Predicate mutation estimates
+
+For supported `ALTER ... UPDATE ... WHERE` and `ALTER ... DELETE ... WHERE`
+mutations, Gozzle executes a bounded, read-only production query using the same
+predicate. It groups matching rows by ClickHouse's `_part` virtual column and
+joins those names to `system.parts`.
+
+The result distinguishes:
+
+- rows that currently match the predicate;
+- all rows contained in the touched parts;
+- the number of touched active parts; and
+- compressed bytes occupied by those complete parts.
+
+This distinction matters because ClickHouse mutations rewrite affected parts,
+not individual rows in place. Operations without a predicate use current table
+metadata as a conservative full-table upper bound.
+
+<Callout type="warn" title="Read-only does not mean unrestricted SQL">
+The estimate query runs against production, although the proposed ALTER never
+does. Gozzle rejects mutation subqueries and external-access functions such as
+`url()`, `s3()`, `remote()`, and `file()` so a dry run cannot turn its predicate
+into arbitrary nested or outbound production reads. Normal query guardrails,
+including execution-time and read limits, still apply.
+</Callout>
+
+## Unsupported boundaries
+
+The current implementation deliberately rejects:
+
+- `ON CLUSTER` operations;
+- compound ALTER commands;
+- quoted table or database identifiers;
+- partition operations, including `UPDATE/DELETE IN PARTITION`;
+- mutation predicates containing subqueries;
+- mutation predicates calling external-access table functions;
+- query-shaping clauses such as top-level `UNION`, `FORMAT`, `INTO`,
+  `GROUP BY`, `ORDER BY`, or `LIMIT`; and
+- unfamiliar ALTER forms without a defensible cost model.
+
+Partition-scoped mutations are rejected because ignoring `IN PARTITION` would
+produce matching-row and touched-part estimates for the whole table. They will
+remain unsupported until the estimator preserves the exact partition scope.
+
+A column named `settings` is supported normally in a predicate. A trailing
+ClickHouse clause such as `SETTINGS mutations_sync = 1` is excluded from the
+predicate estimate.
+
+## Example output
+
+```text
+Table: analytics.events
+Engine: ReplacingMergeTree(version)
+Classification: part-rewriting
+Production execution: not run (read-only analysis)
+
+Verdict: 2 active part(s), containing 500 row(s) and 1.00 MiB, may be rewritten.
+UPDATE is a classic mutation that rewrites affected data parts rather than rows in place.
+
+Current table footprint:
+- rows: 1000
+- active parts: 4
+- compressed bytes: 2097152
+
+Estimated physical rewrite:
+- matching rows: 7
+- rows in touched parts: 500
+- touched parts: 2
+- compressed bytes in touched parts: 1048576
+- evidence: predicate-part-scan
+```
+
+The estimate reflects current active parts. Concurrent inserts, merges, and
+mutations can change the eventual production cost after the dry run.
+
+## Audit privacy
+
+Migration statements can contain sensitive literals. When audit logging is
+enabled, Gozzle records a SHA-256 fingerprint under `statementSha256` rather
+than the raw statement. The formatted tool response still includes the
+statement supplied by the caller so the assessment remains reviewable.
+
+Optional execution against a disposable local slice is not part of this phase;
+the current tool performs classification and read-only production estimation.

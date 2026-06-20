@@ -154,10 +154,19 @@ function parsePredicateMutation(
   if (whereIndex === -1) {
     return unsupported(statement, table, operation, `${kind} mutation has no top-level WHERE predicate.`);
   }
+  const mutationPrefix = operation.slice(0, whereIndex);
+  if (findTopLevelWords(mutationPrefix, "IN PARTITION") !== -1) {
+    return unsupported(
+      statement,
+      table,
+      operation,
+      `${kind} IN PARTITION mutations are not supported because the estimator does not yet preserve partition scope.`
+    );
+  }
   const predicateAndSettings = operation
     .slice(whereIndex + "WHERE".length)
     .trim();
-  const settingsIndex = findTopLevelKeyword(predicateAndSettings, "SETTINGS");
+  const settingsIndex = findSettingsClause(predicateAndSettings);
   const predicate = (
     settingsIndex === -1
       ? predicateAndSettings
@@ -165,6 +174,23 @@ function parsePredicateMutation(
   ).trim();
   if (!predicate) {
     return unsupported(statement, table, operation, `${kind} mutation has an empty WHERE predicate.`);
+  }
+  if (containsUnquotedWord(predicate, "SELECT")) {
+    return unsupported(
+      statement,
+      table,
+      operation,
+      `${kind} predicates containing subqueries are not supported because dry-run predicates execute as production reads.`
+    );
+  }
+  const externalFunction = findExternalAccessFunction(predicate);
+  if (externalFunction) {
+    return unsupported(
+      statement,
+      table,
+      operation,
+      `${kind} predicate calls external-access function ${externalFunction}(), which is not permitted in a production dry run.`
+    );
   }
   const forbiddenClause = [
     "UNION",
@@ -276,6 +302,68 @@ function findTopLevelKeyword(input: string, keyword: string): number {
       !/[A-Za-z0-9_]/.test(after)
     );
   });
+}
+
+function findTopLevelWords(input: string, words: string): number {
+  const pattern = new RegExp(
+    `^${words
+      .split(/\s+/)
+      .map((word) => escapeRegExp(word))
+      .join("\\s+")}(?![A-Za-z0-9_])`,
+    "i"
+  );
+  return scanTopLevel(input, (_character, index) => {
+    const before = index === 0 ? " " : input[index - 1];
+    return !/[A-Za-z0-9_]/.test(before) && pattern.test(input.slice(index));
+  });
+}
+
+function findSettingsClause(input: string): number {
+  const index = findTopLevelKeyword(input, "SETTINGS");
+  if (index <= 0) return -1;
+  const before = input.slice(0, index).trimEnd();
+  const after = input.slice(index + "SETTINGS".length).trimStart();
+  if (/\b(?:AND|OR|NOT)\s*$/i.test(before)) return -1;
+  return /^[A-Za-z_][A-Za-z0-9_]*\s*=/.test(after) ? index : -1;
+}
+
+function containsUnquotedWord(input: string, word: string): boolean {
+  return new RegExp(`\\b${escapeRegExp(word)}\\b`, "i").test(maskQuoted(input));
+}
+
+function findExternalAccessFunction(input: string): string | undefined {
+  const match = maskQuoted(input).match(
+    /\b(url|urlCluster|remote|remoteSecure|cluster|clusterAllReplicas|file|filesystem|s3|s3Cluster|hdfs|hdfsCluster|azureBlobStorage|azureBlobStorageCluster|gcs|iceberg|deltaLake|hudi|mysql|postgresql|mongodb|redis|sqlite|odbc|jdbc|executable|executablePool)\s*\(/i
+  );
+  return match?.[1];
+}
+
+function maskQuoted(input: string): string {
+  const characters = [...input];
+  let quote: "'" | '"' | "`" | undefined;
+  for (let index = 0; index < characters.length; index += 1) {
+    const character = characters[index];
+    if (quote) {
+      characters[index] = " ";
+      if (character === "\\") {
+        index += 1;
+        if (index < characters.length) characters[index] = " ";
+      } else if (character === quote) {
+        if (characters[index + 1] === quote) {
+          index += 1;
+          characters[index] = " ";
+        } else {
+          quote = undefined;
+        }
+      }
+      continue;
+    }
+    if (character === "'" || character === '"' || character === "`") {
+      quote = character;
+      characters[index] = " ";
+    }
+  }
+  return characters.join("");
 }
 
 function scanTopLevel(

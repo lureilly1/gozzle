@@ -38,11 +38,15 @@ One JSON object per line (JSON Lines), one line per tool call:
 | Field | Meaning |
 | --- | --- |
 | `timestamp` | ISO-8601 time the call completed. |
-| `tool` | Tool name (`health`, `connect`, `inspect_table`, `verify_dedup`, `create_local_slice`). |
+| `tool` | Tool name (`health`, `connect`, `inspect_table`, `verify_dedup`, `create_local_slice`, `dry_run_migration`). |
 | `arguments` | Arguments the tool was called with. |
 | `outcome` | `ok` or `error`. |
 | `durationMs` | Wall-clock duration. |
 | `summary` | First line of the tool's output. |
+
+`dry_run_migration` statements can contain sensitive literals. Its audit
+arguments contain a SHA-256 `statementSha256` fingerprint instead of the raw
+statement.
 
 Tail it while you work:
 

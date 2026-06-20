@@ -105,10 +105,11 @@ that ClickHouse may rewrite. Full-table operations use current table metadata
 as a conservative upper bound.
 
 The first implementation intentionally refuses compound ALTERs, `ON CLUSTER`,
-partition operations, quoted table identifiers, and unfamiliar commands rather
-than inferring an unsafe verdict. Audit logs store a hash of the statement, not
-its potentially sensitive literals. Local chDB execution is deferred until
-supported ALTER behavior is validated independently.
+partition operations, quoted table identifiers, mutation subqueries,
+external-access table functions, and unfamiliar commands rather than inferring
+an unsafe verdict. Audit logs store a hash of the statement, not its potentially
+sensitive literals. Local chDB execution is deferred until supported ALTER
+behavior is validated independently.
 
 ## Entry Points
 

@@ -134,3 +134,26 @@ test("unsupported operation makes no rewrite claim", async () => {
   assert.equal(result.rewrite.evidence, "none");
   assert.match(formatMigrationResult(result), /no cost or safety claim was inferred/);
 });
+
+test("unsafe and partition-scoped predicates never reach the estimate query", async () => {
+  for (const statement of [
+    "ALTER TABLE analytics.events DELETE WHERE id IN (SELECT id FROM url('http://169.254.169.254/latest', 'JSONEachRow', 'id UInt64'))",
+    "ALTER TABLE analytics.events UPDATE status = 'done' IN PARTITION '202601' WHERE id = 42"
+  ]) {
+    const client = new FakeMetadataClient();
+    const result = await dryRunMigration(client, {
+      statement,
+      defaultDatabase: "default"
+    });
+    assert.equal(result.parsed.classification, "unsupported");
+    assert.equal(result.rewrite.evidence, "none");
+    assert.equal(
+      client.queries.some((query) => query.includes("INNER JOIN")),
+      false
+    );
+    assert.equal(
+      client.queries.some((query) => query.includes("169.254.169.254")),
+      false
+    );
+  }
+});

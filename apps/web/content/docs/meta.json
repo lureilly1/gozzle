@@ -5,6 +5,7 @@
     "---Checks---",
     "verify-dedup",
     "local-slices",
+    "dry-run-migration",
     "---Safety harness---",
     "read-only",
     "guardrails",

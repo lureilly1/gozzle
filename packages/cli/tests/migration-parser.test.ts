@@ -41,6 +41,46 @@ test("removes mutation SETTINGS from the estimated predicate", () => {
   assert.equal(parsed.predicate, "id = 42");
 });
 
+test("preserves a settings column in the mutation predicate", () => {
+  const direct = parseMigrationStatement(
+    "ALTER TABLE events UPDATE status = 'done' WHERE settings = 1"
+  );
+  const conjunction = parseMigrationStatement(
+    "ALTER TABLE events DELETE WHERE tenant_id = 42 AND settings = 1"
+  );
+  assert.equal(direct.predicate, "settings = 1");
+  assert.equal(conjunction.predicate, "tenant_id = 42 AND settings = 1");
+});
+
+test("refuses partition-scoped predicate mutations", () => {
+  const remove = parseMigrationStatement(
+    "ALTER TABLE events DELETE IN PARTITION '202601' WHERE tenant_id = 42"
+  );
+  const update = parseMigrationStatement(
+    "ALTER TABLE events UPDATE status = 'done' IN PARTITION '202601' WHERE tenant_id = 42"
+  );
+  assert.equal(remove.classification, "unsupported");
+  assert.equal(update.classification, "unsupported");
+  assert.match(remove.reason, /does not yet preserve partition scope/);
+});
+
+test("refuses subqueries and external-access functions in predicates", () => {
+  const subquery = parseMigrationStatement(
+    "ALTER TABLE events DELETE WHERE id IN (SELECT id FROM other_events)"
+  );
+  const remote = parseMigrationStatement(
+    "ALTER TABLE events DELETE WHERE id IN (SELECT id FROM url('http://169.254.169.254/latest', 'JSONEachRow', 'id UInt64'))"
+  );
+  const directExternal = parseMigrationStatement(
+    "ALTER TABLE events DELETE WHERE url('http://example.com') = 1"
+  );
+  assert.equal(subquery.classification, "unsupported");
+  assert.match(subquery.reason, /subqueries are not supported/);
+  assert.equal(remote.classification, "unsupported");
+  assert.equal(directExternal.classification, "unsupported");
+  assert.match(directExternal.reason, /external-access function url/);
+});
+
 test("classifies materialized column operations conservatively", () => {
   const add = parseMigrationStatement(
     "ALTER TABLE events ADD COLUMN day Date MATERIALIZED toDate(timestamp)"
