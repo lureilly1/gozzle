@@ -8,6 +8,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 
 import { createConnectTool } from "../tools/connect.js";
 import { createLocalSliceTool } from "../tools/create-local-slice.js";
+import { createDryRunMigrationTool } from "../tools/dry-run-migration.js";
 import { createHealthTool } from "../tools/health.js";
 import { createInspectTableTool } from "../tools/inspect-table.js";
 import { createVerifyDedupTool } from "../tools/verify-dedup.js";
@@ -25,6 +26,7 @@ export function createGozzleMcpServer(): McpServer {
   createInspectTableTool(server);
   createVerifyDedupTool(server);
   createLocalSliceTool(server);
+  createDryRunMigrationTool(server);
 
   return server;
 }

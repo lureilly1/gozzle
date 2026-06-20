@@ -26,6 +26,9 @@ try {
   const hasCreateLocalSliceTool = tools.tools.some(
     (tool) => tool.name === "create_local_slice"
   );
+  const hasDryRunMigrationTool = tools.tools.some(
+    (tool) => tool.name === "dry_run_migration"
+  );
 
   if (!hasHealthTool) {
     throw new Error("Expected MCP server to expose a health tool.");
@@ -45,6 +48,10 @@ try {
 
   if (!hasCreateLocalSliceTool) {
     throw new Error("Expected MCP server to expose a create_local_slice tool.");
+  }
+
+  if (!hasDryRunMigrationTool) {
+    throw new Error("Expected MCP server to expose a dry_run_migration tool.");
   }
 
   const result = await client.callTool({

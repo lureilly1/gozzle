@@ -91,6 +91,25 @@ their actual size and total storage. Normal cleanup removes valid workspaces.
 Corrupt or incomplete workspaces require the explicit `--invalid` mode; cleanup
 never traverses outside direct children of the configured slice directory.
 
+## Migration Dry Runs
+
+`dry_run_migration` accepts one `ALTER TABLE` statement and returns a verdict
+without executing it on production. It distinguishes metadata-only changes,
+part-rewriting mutations, risky materialized-column changes, and unsupported
+operations.
+
+For `ALTER ... UPDATE` and `ALTER ... DELETE`, Gozzle evaluates the predicate
+read-only and joins matching `_part` values to `system.parts`. The result shows
+both the matching row count and the complete compressed footprint of the parts
+that ClickHouse may rewrite. Full-table operations use current table metadata
+as a conservative upper bound.
+
+The first implementation intentionally refuses compound ALTERs, `ON CLUSTER`,
+partition operations, quoted table identifiers, and unfamiliar commands rather
+than inferring an unsafe verdict. Audit logs store a hash of the statement, not
+its potentially sensitive literals. Local chDB execution is deferred until
+supported ALTER behavior is validated independently.
+
 ## Entry Points
 
 - `gozzle`: CLI entrypoint.

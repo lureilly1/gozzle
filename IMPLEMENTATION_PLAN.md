@@ -21,7 +21,9 @@ The product boundary versus the official ClickHouse MCP is deliberate:
 - Phase 3: complete.
 - Phase 4: complete and verified against ClickHouse Cloud `SharedReplacingMergeTree`.
 - Phase 5: complete for bounded, single-partition ReplacingMergeTree slices using chDB.
-- Next user-facing tool: Phase 6, `dry_run_migration`.
+- Phase 5.1: complete.
+- Phase 6: complete for read-only classification and affected-part estimates.
+- Next user-facing tool: Phase 7, `diagnose_query`.
 
 ## Phase 0: Product Narrowing
 
@@ -244,20 +246,25 @@ Remaining beta validation:
 - Creation output with workspace path, total usage, and cleanup command.
 - Clear concurrent-source-change guidance for proof mismatches.
 
-## Phase 6: Migration Dry Run
+## Phase 6: Migration Dry Run (Core Complete)
 
 Goal: help developers catch dangerous `ALTER` statements before production.
 
 Deliverables:
 
-- `dry_run_migration({ statement })`.
+- `dry_run_migration({ statement })`; never executes the statement on production.
 - Statement classification:
   - metadata-only
   - part-rewriting mutation
   - risky materialized column change
   - unsupported
 - Affected rows/parts/bytes estimates from metadata.
-- Optional execution against the local slice where possible.
+- Predicate-scoped mutation estimates using matching `_part` values joined to
+  `system.parts`, distinguishing matching rows from all rows in touched parts.
+- Conservative full-table upper bounds for operations without a predicate.
+- Statement fingerprints rather than raw migration literals in audit logs.
+- Explicit unsupported verdicts for compound, clustered, partition, quoted
+  identifier, and unfamiliar ALTER forms.
 
 Example output:
 
@@ -278,6 +285,11 @@ Success criteria:
 - Identifies common expensive mutations.
 - Explains why they are risky.
 - Gives concrete affected size estimates.
+
+Deferred Phase 6 extension:
+
+- Optional execution against a disposable copy of a local slice, after each
+  supported ALTER form is validated against chDB semantics.
 
 ## Phase 7: Query Diagnosis
 
