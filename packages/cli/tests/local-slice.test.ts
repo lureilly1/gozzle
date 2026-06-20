@@ -159,6 +159,10 @@ test("createLocalSlice writes a manifest when local proof matches source", async
     const persisted = JSON.parse(await readFile(result.manifestPath, "utf8"));
     assert.equal(persisted.source.table, "analytics.events");
     assert.equal("password" in persisted.source, false);
+    assert.doesNotMatch(
+      JSON.stringify(persisted),
+      /password|credential|authorization|secret/i
+    );
   } finally {
     await rm(root, { recursive: true, force: true });
   }

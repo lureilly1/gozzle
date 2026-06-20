@@ -64,6 +64,17 @@ credential-free `manifest.json`. Source and local proofs must match before
 Gozzle reports the slice as verified. Replay disables chDB's
 `optimize_on_insert` so ReplacingMergeTree duplicates remain visible for proof.
 
+List and remove persisted slices without connecting to ClickHouse:
+
+```bash
+gozzle slices
+gozzle slices clean slice-abc123
+gozzle slices clean --all
+```
+
+Cleanup only removes direct `slice-*` workspaces containing a valid Gozzle
+manifest. A slice ID is required unless `--all` is passed.
+
 ## Entry Points
 
 - `gozzle`: CLI entrypoint.

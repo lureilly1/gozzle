@@ -8,8 +8,9 @@ with the same sorting key **lazily** — during background merges, per partition
 Until a merge runs, duplicates are still physically present, so a plain
 `SELECT count()` is misleading and `SELECT ... FINAL` hides the problem.
 
-`verify_dedup` returns a **verdict plus evidence**: how many rows a merge or
-`FINAL` would collapse, and a sample of the worst-offending keys.
+`verify_dedup` returns a **verdict plus evidence**: how many rows a background
+merge versus `SELECT ... FINAL` would collapse, and a sample of the
+worst-offending keys.
 
 ## Usage
 
@@ -39,16 +40,32 @@ Sample duplicated keys:
 - [partition all] id=2 -> 2 copies
 ```
 
-## How it works
+## Merge vs FINAL on partitioned tables
 
-Gozzle groups rows by `_partition_id` together with the table's sorting key —
-exactly the scope ClickHouse uses when it merges. Duplicates are counted as
-`rows − distinct (partition, sorting key) groups`.
+Two operations remove duplicates, and on a partitioned table they remove
+**different** numbers of rows — so Gozzle reports both:
 
-<Callout title="Per-partition by design">
-Background merges and `FINAL` only collapse duplicates **within a partition**.
-Identical sorting keys in different partitions are never merged, so Gozzle counts
-them per partition and says so in the output when the table is partitioned.
+- **Background merges** run *per partition*. Duplicates sharing a sorting key
+  within one partition are collapsed; identical keys in different partitions are
+  **never** merged, so they are permanent. This is the eventual physical floor.
+- **`SELECT ... FINAL`** deduplicates *globally* by sorting key by default
+  (`do_not_merge_across_partitions_select_final = 0`), so it can collapse more
+  rows than merges ever will.
+
+```text
+Verdict: duplicates differ by scope on this partitioned table:
+- Background merges collapse 1 row(s) across 1 per-partition group(s) (the eventual physical floor).
+- SELECT ... FINAL collapses 3 row(s) (it deduplicates globally by sorting key).
+...
+Notes:
+- 2 of the FINAL-collapsible rows are cross-partition duplicates that background merges never remove.
+```
+
+<Callout title="Why this matters">
+A naive `count()` over-counts duplicates; a single per-partition number
+under-counts what a user sees from `FINAL`. Gozzle reports both, so you know the
+storage floor and the query-time result. For a non-partitioned table the two are
+equal and the verdict collapses to one line.
 </Callout>
 
 ## Eligibility

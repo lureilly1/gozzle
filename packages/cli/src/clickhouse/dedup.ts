@@ -30,7 +30,18 @@ export interface VerifyDedupResult {
   reason?: string;
   totalRows: number;
   duplicateGroups: number;
+  /**
+   * Rows that background merges will collapse: duplicates that share a sorting
+   * key *within the same partition*. This is the physical, eventual floor.
+   */
   duplicateRows: number;
+  /**
+   * Rows that `SELECT ... FINAL` collapses: duplicates by sorting key across
+   * the whole scope (ClickHouse deduplicates globally by default). For a
+   * single partition this equals `duplicateRows`; for a multi-partition table
+   * it can be larger because cross-partition duplicates are never merged.
+   */
+  finalCollapsibleRows: number;
   maxCopies: number;
   sample: DedupSampleRow[];
   warnings: string[];
@@ -62,6 +73,7 @@ export async function verifyDedup(
     totalRows: inspection.totalRows,
     duplicateGroups: 0,
     duplicateRows: 0,
+    finalCollapsibleRows: 0,
     maxCopies: 0,
     sample: [] as DedupSampleRow[],
     warnings: [] as string[]
@@ -120,6 +132,16 @@ export async function verifyDedup(
   const duplicateRows = toNumber(aggregate?.duplicate_rows ?? 0);
   const maxCopies = toNumber(aggregate?.max_copies ?? 0);
 
+  // What `SELECT ... FINAL` would collapse: duplicates by sorting key across the
+  // whole scope, ignoring partitions (ClickHouse deduplicates globally by
+  // default, `do_not_merge_across_partitions_select_final=0`).
+  const [globalRow] = await client.queryJson<{ final_dups: string | number }>(`
+    SELECT count() - uniqExact(${sortingKey}) AS final_dups
+    FROM ${fullTableName}
+    ${partitionFilter}
+  `);
+  const finalCollapsibleRows = toNumber(globalRow?.final_dups ?? 0);
+
   const sample =
     duplicateGroups > 0
       ? await readSample(
@@ -132,9 +154,9 @@ export async function verifyDedup(
       : [];
 
   const warnings: string[] = [];
-  if (base.isPartitioned) {
+  if (base.isPartitioned && finalCollapsibleRows !== duplicateRows) {
     warnings.push(
-      "Duplicates are counted per partition. Identical sorting keys in different partitions are never merged by ClickHouse."
+      `${finalCollapsibleRows - duplicateRows} of the FINAL-collapsible rows are cross-partition duplicates that background merges never remove.`
     );
   }
 
@@ -143,6 +165,7 @@ export async function verifyDedup(
     eligible: true,
     duplicateGroups,
     duplicateRows,
+    finalCollapsibleRows,
     maxCopies,
     sample,
     warnings

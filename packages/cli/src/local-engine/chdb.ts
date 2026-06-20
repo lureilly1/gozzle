@@ -1,15 +1,33 @@
 import { join } from "node:path";
 
-import { Session } from "chdb";
+import type { Session } from "chdb";
 
 import type { ClickHouseMetadataClient } from "../clickhouse/client.js";
 import { quoteIdentifier } from "../clickhouse/identifier.js";
 import type { LocalEngine, LocalReplayInput } from "./types.js";
 
+// chDB ships a native addon that is compiled/downloaded at install time and only
+// supports linux/macOS on x86_64/arm64. It is an optional dependency, so import
+// it lazily: the rest of Gozzle (and the MCP server) must work even where chDB
+// cannot be installed.
+async function loadChdbSession(): Promise<typeof import("chdb").Session> {
+  try {
+    const chdb = await import("chdb");
+    return chdb.Session;
+  } catch (error) {
+    throw new Error(
+      "The local slice engine (chDB) is not available on this platform. " +
+        "chDB is an optional native dependency supporting linux/macOS on x86_64/arm64. " +
+        `Underlying error: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
+
 export class ChdbLocalEngine implements LocalEngine {
   readonly name = "chDB";
 
   async replay(input: LocalReplayInput): Promise<ClickHouseMetadataClient> {
+    const Session = await loadChdbSession();
     const session = new Session(join(input.workspacePath, "chdb"));
     const client = new ChdbMetadataClient(session);
 

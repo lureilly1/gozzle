@@ -77,20 +77,33 @@ export function formatDedupResult(result: VerifyDedupResult): string {
       .trimEnd();
   }
 
-  const verdict =
-    result.duplicateRows > 0
-      ? `${result.duplicateRows} duplicate row(s) across ${result.duplicateGroups} sorting-key group(s) would be collapsed by a merge or FINAL.`
-      : "No pre-merge duplicates by sorting key. The table is effectively deduplicated right now.";
-
   const lines = [
     `Table: ${tableName}`,
     `Engine: ${result.engine}`,
     `Dedup key (ORDER BY): ${result.sortingKey}`,
     `Partitioned: ${result.isPartitioned ? "yes" : "no"}`,
     `Total rows: ${result.totalRows}`,
-    "",
-    `Verdict: ${verdict}`
+    ""
   ];
+
+  if (result.duplicateRows === 0 && result.finalCollapsibleRows === 0) {
+    lines.push(
+      "Verdict: No duplicates by sorting key. The table is effectively deduplicated right now."
+    );
+  } else if (result.duplicateRows === result.finalCollapsibleRows) {
+    // Single partition, or duplicates are entirely within partitions: background
+    // merges and SELECT FINAL collapse the same rows.
+    lines.push(
+      `Verdict: ${result.duplicateRows} duplicate row(s) across ${result.duplicateGroups} sorting-key group(s) would be collapsed by a merge or FINAL.`
+    );
+  } else {
+    // Multi-partition: merges (per partition) and FINAL (global) differ.
+    lines.push(
+      "Verdict: duplicates differ by scope on this partitioned table:",
+      `- Background merges collapse ${result.duplicateRows} row(s) across ${result.duplicateGroups} per-partition group(s) (the eventual physical floor).`,
+      `- SELECT ... FINAL collapses ${result.finalCollapsibleRows} row(s) (it deduplicates globally by sorting key).`
+    );
+  }
 
   if (result.duplicateRows > 0) {
     lines.push(
