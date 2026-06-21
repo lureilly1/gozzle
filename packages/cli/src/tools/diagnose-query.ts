@@ -18,7 +18,7 @@ export function createDiagnoseQueryTool(server: McpServer): void {
     {
       title: "Diagnose ClickHouse Query",
       description:
-        "Run EXPLAIN indexes=1 for one SELECT and return proven pruning findings separately from advisory query-shape risks. The original query is never executed.",
+        "Run EXPLAIN indexes=1, projections=1 for one SELECT and return proven pruning findings separately from advisory query-shape risks. The original query is never executed.",
       inputSchema: {
         query: z
           .string()

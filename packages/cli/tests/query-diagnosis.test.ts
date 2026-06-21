@@ -41,6 +41,8 @@ test("reports full scan and missing pruning as proven findings", async () => {
   );
   assert.equal(result.originalQueryExecuted, false);
   assert.match(client.queries[0], /^\s*EXPLAIN indexes = 1/);
+  assert.match(client.queries[0], /projections = 1/);
+  assert.doesNotMatch(client.queries[0], /pretty|compact/);
   assert.match(formatQueryDiagnosis(result), /3 proven pruning concern/);
   assert.doesNotMatch(formatQueryDiagnosis(result), /lower\(status\)/);
 });

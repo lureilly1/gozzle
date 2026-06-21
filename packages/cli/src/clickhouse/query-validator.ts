@@ -10,16 +10,30 @@ export interface ValidatedQuery {
 
 const EXTERNAL_TABLE_FUNCTIONS = [
   "azureBlobStorage",
+  "azureBlobStorageCluster",
+  "cluster",
+  "clusterAllReplicas",
+  "deltaLake",
+  "executable",
+  "executablePool",
   "file",
+  "filesystem",
   "gcs",
   "hdfs",
+  "hdfsCluster",
+  "hudi",
+  "iceberg",
   "jdbc",
+  "mongodb",
   "mysql",
   "odbc",
   "postgresql",
+  "redis",
   "remote",
   "remoteSecure",
   "s3",
+  "s3Cluster",
+  "sqlite",
   "url"
 ];
 
@@ -39,7 +53,7 @@ export function validateDiagnosticQuery(input: string): ValidatedQuery {
   }
 
   for (const clause of ["INTO OUTFILE", "INTO DUMPFILE"]) {
-    if (findTopLevelKeyword(query, clause) !== -1) {
+    if (findTopLevelWords(query, clause) !== -1) {
       throw new Error(`Top-level ${clause} is not supported by diagnose_query.`);
     }
   }
@@ -99,7 +113,36 @@ function normalizeSingleQuery(input: string): string {
   return normalized;
 }
 
+function findTopLevelWords(input: string, words: string): number {
+  const pattern = new RegExp(
+    `^${words
+      .split(/\s+/)
+      .map((word) => escapeRegExp(word))
+      .join("\\s+")}(?![A-Za-z0-9_])`,
+    "i"
+  );
+  return scanTopLevel(input, (_character, index) => {
+    const before = index === 0 ? " " : input[index - 1];
+    return !/[A-Za-z0-9_]/.test(before) && pattern.test(input.slice(index));
+  });
+}
+
 function findTopLevelKeyword(input: string, keyword: string): number {
+  return scanTopLevel(input, (_character, index) => {
+    const before = index === 0 ? " " : input[index - 1];
+    const after = input[index + keyword.length] ?? " ";
+    return (
+      input.slice(index, index + keyword.length).toUpperCase() === keyword &&
+      !/[A-Za-z0-9_]/.test(before) &&
+      !/[A-Za-z0-9_]/.test(after)
+    );
+  });
+}
+
+function scanTopLevel(
+  input: string,
+  matches: (character: string, index: number) => boolean
+): number {
   let depth = 0;
   let quote: "'" | '"' | "`" | undefined;
   for (let index = 0; index < input.length; index += 1) {
@@ -126,15 +169,7 @@ function findTopLevelKeyword(input: string, keyword: string): number {
     }
     if (depth !== 0) continue;
 
-    const before = index === 0 ? " " : input[index - 1];
-    const after = input[index + keyword.length] ?? " ";
-    if (
-      input.slice(index, index + keyword.length).toUpperCase() === keyword &&
-      !/[A-Za-z0-9_]/.test(before) &&
-      !/[A-Za-z0-9_]/.test(after)
-    ) {
-      return index;
-    }
+    if (matches(character, index)) return index;
   }
   return -1;
 }

@@ -42,10 +42,28 @@ test("rejects non-SELECT, multiple statements, and output clauses", () => {
 });
 
 test("rejects external table functions", () => {
-  assert.throws(
-    () => validateDiagnosticQuery("SELECT * FROM s3('https://example.com/a.parquet')"),
-    /External table function s3/
-  );
+  for (const [query, functionName] of [
+    ["SELECT * FROM s3('https://example.com/a.parquet')", "s3"],
+    ["SELECT * FROM s3Cluster('cluster', 'https://example.com/a.parquet')", "s3Cluster"],
+    ["SELECT * FROM filesystem()", "filesystem"],
+    ["SELECT * FROM clusterAllReplicas('cluster', system, numbers)", "clusterAllReplicas"]
+  ]) {
+    assert.throws(
+      () => validateDiagnosticQuery(query),
+      new RegExp(`External table function ${functionName}`)
+    );
+  }
+});
+
+test("rejects output clauses with flexible whitespace", () => {
+  for (const query of [
+    "SELECT 1 INTO OUTFILE '/tmp/result'",
+    "SELECT 1 INTO   OUTFILE '/tmp/result'",
+    "SELECT 1 INTO\nOUTFILE '/tmp/result'",
+    "SELECT 1 INTO\tDUMPFILE '/tmp/result'"
+  ]) {
+    assert.throws(() => validateDiagnosticQuery(query), /Top-level INTO/);
+  }
 });
 
 test("does not treat literals or similarly named columns as query clauses", () => {

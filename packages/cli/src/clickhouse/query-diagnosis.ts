@@ -33,7 +33,7 @@ export async function diagnoseQuery(
 ): Promise<DiagnoseQueryResult> {
   const validated = validateDiagnosticQuery(query);
   const rows = await client.queryJson<ExplainRow>(`
-    EXPLAIN indexes = 1, projections = 1, pretty = 0, compact = 0
+    EXPLAIN indexes = 1, projections = 1
     ${validated.query}
   `);
   const explain = parseExplainRows(rows);
