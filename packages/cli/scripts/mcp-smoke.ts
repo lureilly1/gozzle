@@ -29,6 +29,9 @@ try {
   const hasDryRunMigrationTool = tools.tools.some(
     (tool) => tool.name === "dry_run_migration"
   );
+  const hasDiagnoseQueryTool = tools.tools.some(
+    (tool) => tool.name === "diagnose_query"
+  );
 
   if (!hasHealthTool) {
     throw new Error("Expected MCP server to expose a health tool.");
@@ -52,6 +55,10 @@ try {
 
   if (!hasDryRunMigrationTool) {
     throw new Error("Expected MCP server to expose a dry_run_migration tool.");
+  }
+
+  if (!hasDiagnoseQueryTool) {
+    throw new Error("Expected MCP server to expose a diagnose_query tool.");
   }
 
   const result = await client.callTool({

@@ -23,7 +23,8 @@ The product boundary versus the official ClickHouse MCP is deliberate:
 - Phase 5: complete for bounded, single-partition ReplacingMergeTree slices using chDB.
 - Phase 5.1: complete.
 - Phase 6: complete for read-only classification and affected-part estimates.
-- Next user-facing tool: Phase 7, `diagnose_query`.
+- Phase 7: complete for EXPLAIN-backed pruning evidence and query-shape advice.
+- Next milestone: Phase 8, the broader fixture and integration test harness.
 
 ## Phase 0: Product Narrowing
 
@@ -291,14 +292,14 @@ Deferred Phase 6 extension:
 - Optional execution against a disposable copy of a local slice, after each
   supported ALTER form is validated against chDB semantics.
 
-## Phase 7: Query Diagnosis
+## Phase 7: Query Diagnosis (Complete)
 
 Goal: broaden from correctness into developer toolkit territory.
 
 Deliverables:
 
 - `diagnose_query({ query })`.
-- Uses `EXPLAIN indexes = 1`.
+- Uses `EXPLAIN indexes = 1, projections = 1`; never runs the original query.
 - Detects:
   - full table scans
   - missing partition pruning
@@ -307,12 +308,19 @@ Deliverables:
   - avoidable `FINAL`
   - expensive joins where obvious
 - Returns candidate fixes as advice, not auto-applied changes.
+- Reports selected/total parts and granules as evidence per MergeTree table.
+- Separates EXPLAIN-proven pruning failures from static advisories.
+- Rejects non-SELECT statements, external table functions, output clauses,
+  query-level settings, comments, and multiple statements.
+- Stores query fingerprints rather than SQL literals in output and audit logs.
 
 Success criteria:
 
 - Produces useful diagnosis on common slow query patterns.
 - Separates verified findings from advisory findings.
 - Avoids pretending to prove performance deltas before the fidelity spike.
+- Embedded chDB tests prove full-scan and primary-key-pruning classification
+  against the ClickHouse EXPLAIN output shipped with Gozzle.
 
 ## Phase 8: Test Harness and Fixtures
 

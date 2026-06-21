@@ -7,6 +7,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
 import { createConnectTool } from "../tools/connect.js";
+import { createDiagnoseQueryTool } from "../tools/diagnose-query.js";
 import { createLocalSliceTool } from "../tools/create-local-slice.js";
 import { createDryRunMigrationTool } from "../tools/dry-run-migration.js";
 import { createHealthTool } from "../tools/health.js";
@@ -27,6 +28,7 @@ export function createGozzleMcpServer(): McpServer {
   createVerifyDedupTool(server);
   createLocalSliceTool(server);
   createDryRunMigrationTool(server);
+  createDiagnoseQueryTool(server);
 
   return server;
 }

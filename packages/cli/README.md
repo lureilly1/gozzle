@@ -111,6 +111,23 @@ an unsafe verdict. Audit logs store a hash of the statement, not its potentially
 sensitive literals. Local chDB execution is deferred until supported ALTER
 behavior is validated independently.
 
+## Query Diagnosis
+
+`diagnose_query` accepts one `SELECT` or `WITH ... SELECT` query and runs only
+`EXPLAIN indexes = 1, projections = 1`. It never executes the original query.
+
+Gozzle reports index conditions and selected/total parts and granules for each
+MergeTree read. Full scans, absent partition pruning, and absent primary-key
+granule pruning are marked as proven only when the EXPLAIN ratios support that
+claim. `FINAL`, function-wrapped predicates, leading-wildcard searches, broad
+joins, and `SELECT *` are reported separately as advisories.
+
+The MVP rejects multiple statements, comments, output clauses, query-level
+settings, external table functions, and non-SELECT statements. Audit logs and
+tool output use a query fingerprint rather than echoing SQL literals. EXPLAIN
+does not prove runtime duration, memory use, network transfer, join cardinality,
+or the performance improvement from a suggested rewrite.
+
 ## Entry Points
 
 - `gozzle`: CLI entrypoint.
