@@ -1,0 +1,53 @@
+name: Integration
+
+# Protocol-level tests against a real ClickHouse server: readonly=2
+# enforcement, guardrail-setting coexistence, and read-limit overflow.
+# These prove the safety claims chDB cannot, before any beta user points
+# Gozzle at a real database.
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+
+    services:
+      clickhouse:
+        image: clickhouse/clickhouse-server:24.8
+        env:
+          # Write-capable account; the tests prove readonly=2 blocks writes
+          # despite full grants.
+          CLICKHOUSE_PASSWORD: gozzle
+        ports:
+          - 8123:8123
+        options: >-
+          --health-cmd "wget --spider -q http://localhost:8123/ping"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build -w @gozzle/cli
+
+      - name: Integration tests
+        run: npm run test:integration -w @gozzle/cli
+        env:
+          GOZZLE_CLICKHOUSE_URL: http://localhost:8123
+          GOZZLE_CLICKHOUSE_PASSWORD: gozzle

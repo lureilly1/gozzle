@@ -1,0 +1,26 @@
+# Disposable ClickHouse server for Gozzle's integration tests.
+# Proves protocol-level behavior chDB cannot: readonly=2 enforcement,
+# guardrail settings coexistence, and read-limit overflow.
+#
+#   docker compose -f tests/integration/docker-compose.yml up -d
+#   GOZZLE_CLICKHOUSE_URL=http://localhost:8123 \
+#     GOZZLE_CLICKHOUSE_PASSWORD=gozzle npm run test:integration
+#   docker compose -f tests/integration/docker-compose.yml down -v
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-24.8}
+    environment:
+      # An explicit, write-capable account: the readonly tests prove that
+      # readonly=2 blocks writes despite the account having full grants.
+      CLICKHOUSE_PASSWORD: gozzle
+    ports:
+      - "8123:8123" # HTTP interface used by @clickhouse/client
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20

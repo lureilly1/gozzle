@@ -24,7 +24,8 @@
     "lint": "tsc -p tsconfig.json --noEmit",
     "prepublishOnly": "npm run build && npm test",
     "smoke:mcp": "npm run build && node dist/scripts/mcp-smoke.js",
-    "test": "node --import tsx --test tests/**/*.test.ts"
+    "test": "node --import tsx --test tests/*.test.ts",
+    "test:integration": "node --import tsx --test tests/integration/*.test.ts"
   },
   "dependencies": {
     "@clickhouse/client": "^1.21.0",
