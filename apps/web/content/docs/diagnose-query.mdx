@@ -1,0 +1,75 @@
+---
+title: Query diagnosis
+description: Prove ClickHouse pruning behavior with EXPLAIN and separate it from advisory query-shape risks
+---
+
+`diagnose_query` accepts one `SELECT` or `WITH ... SELECT` query and runs only
+`EXPLAIN indexes = 1, projections = 1`. The original query is never executed.
+
+## Usage
+
+Ask your AI client:
+
+> Use Gozzle to diagnose this query: `SELECT count() FROM analytics.events WHERE tenant_id = 42`.
+
+The tool accepts one parameter:
+
+- `query` — exactly one ClickHouse `SELECT` or `WITH ... SELECT` query.
+
+## Proven evidence
+
+For every MergeTree read reported by EXPLAIN, Gozzle captures:
+
+- MinMax, partition, and primary-key conditions;
+- selected and total parts; and
+- selected and total granules.
+
+Gozzle reports a full scan only when EXPLAIN shows every reported part and
+granule selected. Missing partition pruning and missing primary-key pruning are
+also proven only when the corresponding condition is `true` and the selection
+ratio shows no reduction.
+
+```text
+Verdict: 3 proven pruning concern(s); 1 advisory finding(s).
+
+EXPLAIN evidence:
+- analytics.events
+  MinMax: condition=true, parts=4/4, granules=20/20
+  Partition: condition=true, parts=4/4, granules=20/20
+  PrimaryKey: condition=true, parts=4/4, granules=20/20
+```
+
+## Advisories
+
+The following findings are query-shape warnings, not proven performance
+problems:
+
+- `FINAL`, because EXPLAIN does not prove whether deduplication is required;
+- functions applied in `WHERE` or `PREWHERE` predicates;
+- leading-wildcard `LIKE` searches;
+- `CROSS JOIN` or multiple joins; and
+- `SELECT *`.
+
+For `FINAL`, run [`verify_dedup`](/docs/verify-dedup) before deciding whether it
+is required for correctness. Join cardinality and runtime cost require
+representative data and are deliberately not inferred from syntax alone.
+
+<Callout type="info" title="EXPLAIN is evidence, not a benchmark">
+The tool proves index selection behavior. It does not measure runtime duration,
+memory use, network transfer, cache effects, join cardinality, or the speedup
+from a proposed rewrite.
+</Callout>
+
+## Safety boundary
+
+The MVP rejects:
+
+- non-SELECT statements;
+- multiple statements and SQL comments;
+- top-level `FORMAT`, `SETTINGS`, and output clauses; and
+- external table functions such as `s3()`, `url()`, `remote()`, and `file()`.
+
+The configured read-only and query-cost guardrails still apply to EXPLAIN.
+Successful responses and audit entries contain a SHA-256 query fingerprint
+rather than the original SQL or its literals. Server-side EXPLAIN errors are
+reduced to an error code and generic guidance to avoid echoing query fragments.

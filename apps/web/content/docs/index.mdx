@@ -32,6 +32,7 @@ returns rows. Gozzle is the opposite — a **safety harness**:
 | [`verify_dedup`](/docs/verify-dedup) | Prove whether a ReplacingMergeTree table currently holds duplicate rows by sorting key. |
 | [`create_local_slice`](/docs/local-slices) | Copy one complete partition to a bounded, persistent local chDB workspace and compare source/local proof. |
 | [`dry_run_migration`](/docs/dry-run-migration) | Classify one ALTER statement and estimate touched rows, parts, and bytes without executing it. |
+| [`diagnose_query`](/docs/diagnose-query) | Prove partition and primary-key pruning behavior with EXPLAIN, with separate query-shape advisories. |
 
 ## Install
 

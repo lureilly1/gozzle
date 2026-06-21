@@ -6,6 +6,7 @@
     "verify-dedup",
     "local-slices",
     "dry-run-migration",
+    "diagnose-query",
     "---Safety harness---",
     "read-only",
     "guardrails",
