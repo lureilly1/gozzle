@@ -15,6 +15,11 @@ export default function HomePage() {
         </Link>{' '}
         to get started.
       </p>
+      <p className="text-fd-muted-foreground text-sm">
+        <Link href="/docs/privacy" className="underline">
+          Privacy
+        </Link>
+      </p>
     </div>
   );
 }

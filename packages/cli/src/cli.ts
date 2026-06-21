@@ -3,6 +3,7 @@
 import { readPackageMetadata } from "./shared/package-metadata.js";
 import { readLocalSliceConfig } from "./config/local-slice.js";
 import { cleanLocalSlices, listLocalSlices } from "./local-engine/slice-store.js";
+import { isHostId, renderInit } from "./init/mcp-config.js";
 
 const metadata = readPackageMetadata();
 const command = process.argv[2] ?? "help";
@@ -13,7 +14,11 @@ if (command === "version" || command === "--version" || command === "-v") {
 }
 
 if (command === "init") {
-  printInit();
+  const host = process.argv[3];
+  if (host !== undefined && !isHostId(host)) {
+    fail("Usage: gozzle init [claude|cursor|codex]");
+  }
+  console.log(renderInit(host));
   process.exit(0);
 }
 
@@ -25,36 +30,10 @@ if (command === "slices") {
 console.log(`gozzle ${metadata.version}`);
 console.log("");
 console.log("Commands:");
-console.log("  gozzle init        Print MCP config for your AI host");
+console.log("  gozzle init [host] Print MCP config (host: claude, cursor, codex)");
 console.log("  gozzle slices      List and clean local slice workspaces");
 console.log("  gozzle version     Print the CLI version");
 console.log("  gozzle-mcp         Start the MCP stdio server");
-
-function printInit(): void {
-  console.log("Add this MCP server config to Claude, Cursor, Codex, or another MCP host:");
-  console.log("");
-  console.log(
-    JSON.stringify(
-      {
-        mcpServers: {
-          gozzle: {
-            command: "gozzle-mcp",
-            env: {
-              GOZZLE_CLICKHOUSE_URL: "https://your-cluster.clickhouse.cloud:8443",
-              GOZZLE_CLICKHOUSE_USER: "gozzle_readonly",
-              GOZZLE_CLICKHOUSE_PASSWORD: "replace-me",
-              GOZZLE_CLICKHOUSE_DATABASE: "default"
-            }
-          }
-        }
-      },
-      null,
-      2
-    )
-  );
-  console.log("");
-  console.log("Use a read-only ClickHouse user. Gozzle does not need write access.");
-}
 
 async function runSlicesCommand(args: string[]): Promise<void> {
   const action = args[0] ?? "list";

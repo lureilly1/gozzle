@@ -15,10 +15,14 @@ npm install -g @gozzle/cli@canary
 Then print the MCP config snippet:
 
 ```bash
-gozzle init
+gozzle init            # snippets for Claude Code, Cursor, and Codex
+gozzle init claude     # just one host: claude, cursor, or codex
 ```
 
-Add the printed config to Claude, Cursor, Codex, or another MCP host.
+`gozzle init` prints the config block and the file it belongs in for each host.
+URL, user, and database are filled from your environment when set; the password
+is always a placeholder so a secret is never printed. Use a read-only ClickHouse
+user — Gozzle forces `readonly=2` on every query and never needs write access.
 
 ## Development
 
