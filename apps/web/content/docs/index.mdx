@@ -36,8 +36,18 @@ returns rows. gozzle is the opposite — a **safety harness**:
 
 ## Install
 
+**Project-local (recommended for teams)** — the version is committed to the repo,
+so everyone (and CI) runs the same gozzle:
+
 ```bash
-npm install -g @gozzle/cli@canary
+npm install -D @gozzle/cli
+npx gozzle init --local      # prints an MCP config that launches via npx
+```
+
+**Global** — for a quick personal setup:
+
+```bash
+npm install -g @gozzle/cli
 gozzle init
 ```
 

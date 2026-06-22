@@ -6,17 +6,19 @@ gozzle is a local developer toolkit for ClickHouse. The AI reasons; gozzle runs 
 
 ## Install
 
-For early canary builds:
+Project-local (recommended for teams — the version lives in the repo):
 
 ```bash
-npm install -g @gozzle/cli@canary
+npm install -D @gozzle/cli
+npx gozzle init --local   # MCP config that launches the server via npx
 ```
 
-Then print the MCP config snippet:
+Or global, for a quick personal setup:
 
 ```bash
-gozzle init            # snippets for Claude Code, Cursor, and Codex
-gozzle init claude     # just one host: claude, cursor, or codex
+npm install -g @gozzle/cli
+gozzle init               # snippets for Claude Code, Cursor, and Codex
+gozzle init claude        # just one host: claude, cursor, or codex
 ```
 
 `gozzle init` prints the config block and the file it belongs in for each host.

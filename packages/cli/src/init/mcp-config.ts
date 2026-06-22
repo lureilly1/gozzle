@@ -85,12 +85,25 @@ function connectionEnv(
   };
 }
 
-function jsonMcpServers(conn: ConnectionPlaceholders): string {
+/**
+ * How the host launches the server. Global installs invoke the `gozzle-mcp` bin
+ * directly; a project-local install (devDependency) is launched via `npx` so the
+ * host resolves the version committed to the repo.
+ */
+function serverInvocation(local: boolean): { command: string; args?: string[] } {
+  return local
+    ? { command: "npx", args: ["gozzle-mcp"] }
+    : { command: "gozzle-mcp" };
+}
+
+function jsonMcpServers(conn: ConnectionPlaceholders, local: boolean): string {
+  const { command, args } = serverInvocation(local);
   return JSON.stringify(
     {
       mcpServers: {
         gozzle: {
-          command: "gozzle-mcp",
+          command,
+          ...(args ? { args } : {}),
           env: connectionEnv(conn)
         }
       }
@@ -100,39 +113,42 @@ function jsonMcpServers(conn: ConnectionPlaceholders): string {
   );
 }
 
-function buildClaude(conn: ConnectionPlaceholders): HostSnippet {
+function buildClaude(conn: ConnectionPlaceholders, local: boolean): HostSnippet {
   const env = connectionEnv(conn);
   const envFlags = Object.entries(env)
     .map(([key, value]) => `--env ${key}="${value}"`)
     .join(" ");
+  const launch = local ? "npx gozzle-mcp" : "gozzle-mcp";
 
   return {
     id: "claude",
     title: "Claude Code",
     configPath: ".mcp.json (project) or ~/.claude.json (user)",
-    snippet: jsonMcpServers(conn),
-    cliCommand: `claude mcp add gozzle ${envFlags} -- gozzle-mcp`
+    snippet: jsonMcpServers(conn, local),
+    cliCommand: `claude mcp add gozzle ${envFlags} -- ${launch}`
   };
 }
 
-function buildCursor(conn: ConnectionPlaceholders): HostSnippet {
+function buildCursor(conn: ConnectionPlaceholders, local: boolean): HostSnippet {
   return {
     id: "cursor",
     title: "Cursor",
     configPath: "~/.cursor/mcp.json (global) or .cursor/mcp.json (project)",
-    snippet: jsonMcpServers(conn)
+    snippet: jsonMcpServers(conn, local)
   };
 }
 
-function buildCodex(conn: ConnectionPlaceholders): HostSnippet {
+function buildCodex(conn: ConnectionPlaceholders, local: boolean): HostSnippet {
   const env = connectionEnv(conn);
   const envInline = Object.entries(env)
     .map(([key, value]) => `${key} = "${value}"`)
     .join(", ");
+  const { command, args } = serverInvocation(local);
 
   const snippet = [
     "[mcp_servers.gozzle]",
-    'command = "gozzle-mcp"',
+    `command = "${command}"`,
+    ...(args ? [`args = [${args.map((a) => `"${a}"`).join(", ")}]`] : []),
     `env = { ${envInline} }`
   ].join("\n");
 
@@ -144,7 +160,10 @@ function buildCodex(conn: ConnectionPlaceholders): HostSnippet {
   };
 }
 
-const BUILDERS: Record<HostId, (conn: ConnectionPlaceholders) => HostSnippet> = {
+const BUILDERS: Record<
+  HostId,
+  (conn: ConnectionPlaceholders, local: boolean) => HostSnippet
+> = {
   claude: buildClaude,
   cursor: buildCursor,
   codex: buildCodex
@@ -152,9 +171,10 @@ const BUILDERS: Record<HostId, (conn: ConnectionPlaceholders) => HostSnippet> = 
 
 export function buildSnippet(
   host: HostId,
-  conn: ConnectionPlaceholders = resolvePlaceholders()
+  conn: ConnectionPlaceholders = resolvePlaceholders(),
+  local = false
 ): HostSnippet {
-  return BUILDERS[host](conn);
+  return BUILDERS[host](conn, local);
 }
 
 export function isHostId(value: string): value is HostId {
@@ -168,16 +188,21 @@ export function isHostId(value: string): value is HostId {
  */
 export function renderInit(
   host?: HostId,
-  conn: ConnectionPlaceholders = resolvePlaceholders()
+  conn: ConnectionPlaceholders = resolvePlaceholders(),
+  local = false
 ): string {
   const hosts = host ? [host] : HOST_IDS;
   const lines: string[] = [
-    "Configure gozzle as an MCP server in your AI host.",
+    `Configure gozzle as an MCP server in your AI host (${
+      local
+        ? "project-local install — launched via npx"
+        : "global install — requires `npm i -g @gozzle/cli`"
+    }).`,
     ""
   ];
 
   for (const id of hosts) {
-    const built = buildSnippet(id, conn);
+    const built = buildSnippet(id, conn, local);
     lines.push(`# ${built.title}`);
     lines.push(`Config file: ${built.configPath}`);
     lines.push("");

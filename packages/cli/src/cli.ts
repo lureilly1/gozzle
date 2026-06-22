@@ -16,11 +16,13 @@ if (command === "version" || command === "--version" || command === "-v") {
 }
 
 if (command === "init") {
-  const host = process.argv[3];
+  const args = process.argv.slice(3);
+  const local = args.includes("--local");
+  const host = args.find((arg) => !arg.startsWith("--"));
   if (host !== undefined && !isHostId(host)) {
-    fail("Usage: gozzle init [claude|cursor|codex]");
+    fail("Usage: gozzle init [claude|cursor|codex] [--local]");
   }
-  console.log(renderInit(host));
+  console.log(renderInit(host, undefined, local));
   process.exit(0);
 }
 
@@ -47,7 +49,7 @@ console.log(`gozzle ${metadata.version}`);
 console.log("");
 console.log("Commands:");
 console.log("  gozzle verify        Verify SQL files | --changed | --diff <range> | --all (exit 1 on findings)");
-console.log("  gozzle init [host] Print MCP config (host: claude, cursor, codex)");
+console.log("  gozzle init [host] Print MCP config (host: claude, cursor, codex; --local for project install)");
 console.log("  gozzle skill [host] Print the agent instruction to auto-verify ClickHouse changes");
 console.log("  gozzle slices      List and clean local slice workspaces");
 console.log("  gozzle version     Print the CLI version");

@@ -92,6 +92,31 @@ test("renderInit always carries the read-only safety guidance", () => {
   assert.match(output, /No table data leaves your machine/i);
 });
 
+test("local mode launches the server via npx (Claude JSON + CLI)", () => {
+  const built = buildSnippet("claude", undefined, true);
+  const parsed = JSON.parse(built.snippet);
+  assert.equal(parsed.mcpServers.gozzle.command, "npx");
+  assert.deepEqual(parsed.mcpServers.gozzle.args, ["gozzle-mcp"]);
+  assert.match(built.cliCommand ?? "", /-- npx gozzle-mcp$/);
+});
+
+test("local mode emits npx command + args in Codex TOML", () => {
+  const built = buildSnippet("codex", undefined, true);
+  assert.match(built.snippet, /command = "npx"/);
+  assert.match(built.snippet, /args = \["gozzle-mcp"\]/);
+});
+
+test("global mode (default) still invokes the gozzle-mcp bin directly", () => {
+  const parsed = JSON.parse(buildSnippet("cursor").snippet);
+  assert.equal(parsed.mcpServers.gozzle.command, "gozzle-mcp");
+  assert.equal(parsed.mcpServers.gozzle.args, undefined);
+});
+
+test("renderInit notes the install mode", () => {
+  assert.match(renderInit(undefined, undefined, true), /project-local install/);
+  assert.match(renderInit(), /global install/);
+});
+
 test("isHostId recognizes supported hosts and rejects others", () => {
   assert.ok(isHostId("claude"));
   assert.ok(isHostId("cursor"));
