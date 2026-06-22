@@ -30,6 +30,7 @@
   "dependencies": {
     "@clickhouse/client": "^1.21.0",
     "@modelcontextprotocol/sdk": "^1.18.0",
+    "yaml": "^2.9.0",
     "zod": "^4.0.0"
   },
   "optionalDependencies": {

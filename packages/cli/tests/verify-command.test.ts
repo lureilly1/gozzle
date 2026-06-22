@@ -9,8 +9,10 @@ import {
   aggregateExitCode,
   parseVerifyArgs,
   runVerifyCommand,
+  selectVerifiableFiles,
   verifyFiles
 } from "../src/commands/verify.js";
+import type { GozzleProjectConfig } from "../src/config/project.js";
 
 class FakeMetadataClient implements ClickHouseMetadataClient {
   constructor(private readonly responses: Record<string, unknown[]>) {}
@@ -88,9 +90,45 @@ const OPTS = { strict: false, json: false };
 test("parseVerifyArgs collects files and flags, rejects unknown flags", () => {
   assert.deepEqual(parseVerifyArgs(["a.sql", "--strict", "b.sql"]), {
     files: ["a.sql", "b.sql"],
-    options: { strict: true, json: false }
+    options: { strict: true, json: false, changed: false }
   });
   assert.equal(parseVerifyArgs(["--bogus"]).error, "Unknown flag: --bogus");
+});
+
+test("parseVerifyArgs handles --changed and --diff <range>", () => {
+  assert.equal(parseVerifyArgs(["--changed"]).options.changed, true);
+  assert.equal(
+    parseVerifyArgs(["--diff", "origin/main...HEAD"]).options.diff,
+    "origin/main...HEAD"
+  );
+  assert.match(parseVerifyArgs(["--diff"]).error ?? "", /--diff requires a git range/);
+  assert.match(
+    parseVerifyArgs(["--diff", "--strict"]).error ?? "",
+    /--diff requires a git range/
+  );
+});
+
+test("selectVerifiableFiles filters by config globs, else by .sql", () => {
+  const files = [
+    "app/models/revenue.sql",
+    "migrations/2026_add.sql",
+    "README.md",
+    "src/index.ts"
+  ];
+  assert.deepEqual(selectVerifiableFiles(files), [
+    "app/models/revenue.sql",
+    "migrations/2026_add.sql"
+  ]);
+
+  const config: GozzleProjectConfig = {
+    queries: ["app/**/*.sql"],
+    migrations: ["migrations/**/*.sql"],
+    assumptions: {}
+  };
+  assert.deepEqual(selectVerifiableFiles([...files, "dashboards/x.sql"], config), [
+    "app/models/revenue.sql",
+    "migrations/2026_add.sql"
+  ]);
 });
 
 test("aggregateExitCode: error > findings > clean", () => {
