@@ -1,0 +1,94 @@
+/* Landing page — terminal aesthetic. Keyframes, pseudo-elements, hover, and
+   responsive rules that inline styles can't express live here. Decorative
+   one-off colors stay inline in page.tsx for fidelity to the design. */
+
+.root {
+  min-height: 100vh;
+  background: #0d0d0d;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+.root ::selection {
+  background: #f2c14e;
+  color: #0d0d0d;
+}
+
+@keyframes gz-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+@keyframes gz-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+.blink { animation: gz-blink 1.1s step-end infinite; }
+.bob { animation: gz-bob 2.6s ease-in-out infinite; }
+
+.nav a {
+  color: #9a9a90;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.nav a:hover { color: #f2c14e; }
+
+.faqItem {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.faqItem:hover { background: rgba(242, 193, 78, 0.04); }
+
+.cta {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: #0d0d0d;
+  background: #f2c14e;
+  border: none;
+  border-radius: 7px;
+  padding: 9px 16px;
+  cursor: pointer;
+  letter-spacing: -0.2px;
+  transition: filter 0.15s;
+}
+.cta:hover { filter: brightness(1.08); }
+
+/* Body columns: structural layout here so media queries can restack them. */
+.body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  gap: 38px;
+  padding: 30px 34px 26px;
+  align-items: flex-start;
+}
+.leftCol { flex: 1.45; min-width: 0; }
+.rightCol {
+  flex: 1;
+  min-width: 0;
+  border-left: 1px solid rgba(255, 255, 255, 0.06);
+  padding-left: 34px;
+}
+
+@media (max-width: 900px) {
+  .body {
+    flex-direction: column;
+    gap: 24px;
+    padding: 24px;
+    overflow: auto;
+  }
+  .rightCol {
+    width: 100%;
+    border-left: none;
+    padding-left: 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    padding-top: 24px;
+  }
+  .navLinks { display: none; }
+}
+
+@media (max-width: 560px) {
+  .headline { font-size: 30px !important; }
+}

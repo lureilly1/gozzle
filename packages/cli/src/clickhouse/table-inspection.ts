@@ -161,7 +161,12 @@ export async function inspectTable(
     engineFull,
     createStatement,
     orderBy: extractClause(createStatement, "ORDER BY"),
-    partitionBy: extractClause(createStatement, "PARTITION BY"),
+    // system.tables exposes the canonical partition expression; prefer it over
+    // scanning the SHOW CREATE text, which is fragile around comments and nested
+    // expressions. Fall back to the DDL only when the column is empty.
+    partitionBy:
+      normalizeOptional(table.partition_key) ??
+      extractClause(createStatement, "PARTITION BY"),
     primaryKey: normalizeOptional(table.primary_key),
     sortingKey: normalizeOptional(table.sorting_key),
     totalRows: toNumber(table.total_rows),

@@ -24,41 +24,54 @@ export function createVerifyDedupTool(server: McpServer): void {
           .min(1)
           .max(50)
           .optional()
-          .describe("How many duplicated keys to return as evidence (default 5).")
+          .describe("How many duplicated keys to return as evidence (default 5)."),
+        partitionId: z
+          .string()
+          .min(1)
+          .optional()
+          .describe(
+            "Scope the proof to one physical partition id (from inspect_table). Use this for large tables."
+          )
       }
     },
-    async ({ table, sampleLimit }) =>
-      runAuditedTool("verify_dedup", { table, sampleLimit }, async () => {
-        let client: ClickHouseHttpMetadataClient | undefined;
+    async ({ table, sampleLimit, partitionId }) =>
+      runAuditedTool(
+        "verify_dedup",
+        { table, sampleLimit, partitionId },
+        async () => {
+          let client: ClickHouseHttpMetadataClient | undefined;
 
-        try {
-          const config = readClickHouseConfig();
-          client = new ClickHouseHttpMetadataClient(config);
-          const result = await verifyDedup(client, {
-            table,
-            defaultDatabase: config.database ?? "default",
-            sampleLimit
-          });
+          try {
+            const config = readClickHouseConfig();
+            const scanGuard = readDedupScanGuard();
+            client = new ClickHouseHttpMetadataClient(config);
+            const result = await verifyDedup(client, {
+              table,
+              defaultDatabase: config.database ?? "default",
+              sampleLimit,
+              partitionId,
+              maxScanRows: scanGuard.maxScanRows,
+              maxScanBytes: scanGuard.maxScanBytes
+            });
 
-          return {
-            content: [{ type: "text", text: formatDedupResult(result) }]
-          };
-        } catch (error) {
-          return {
-            isError: true,
-            content: [
-              {
-                type: "text",
-                text: `Gozzle could not verify deduplication.\n\n${formatErrorMessage(
-                  error
-                )}`
-              }
-            ]
-          };
-        } finally {
-          await client?.close();
+            return {
+              content: [{ type: "text", text: formatDedupResult(result) }]
+            };
+          } catch (error) {
+            return {
+              isError: true,
+              content: [
+                {
+                  type: "text",
+                  text: formatDedupError(error)
+                }
+              ]
+            };
+          } finally {
+            await client?.close();
+          }
         }
-      })
+      )
   );
 }
 
@@ -75,6 +88,27 @@ export function formatDedupResult(result: VerifyDedupResult): string {
     ]
       .join("\n")
       .trimEnd();
+  }
+
+  if (result.scanSkipped) {
+    const lines = [
+      `Table: ${tableName}`,
+      `Engine: ${result.engine}`,
+      `Dedup key (ORDER BY): ${result.sortingKey}`,
+      `Total rows: ${result.totalRows}`,
+      "",
+      "Verdict: table too large to prove in one pass.",
+      result.reason ?? ""
+    ];
+    if (result.largestPartitions && result.largestPartitions.length > 0) {
+      lines.push("", "Largest partitions (re-run with partitionId):");
+      for (const partition of result.largestPartitions) {
+        lines.push(
+          `- ${partition.partitionId} (${partition.rows} rows, ${partition.bytes} bytes)`
+        );
+      }
+    }
+    return lines.join("\n").trimEnd();
   }
 
   const lines = [
@@ -135,6 +169,55 @@ function formatValue(value: unknown): string {
   }
 
   return typeof value === "string" ? value : JSON.stringify(value);
+}
+
+const DEFAULT_MAX_SCAN_ROWS = 200_000_000;
+const DEFAULT_MAX_SCAN_BYTES = 50_000_000_000;
+
+interface DedupScanGuard {
+  maxScanRows: number;
+  maxScanBytes: number;
+}
+
+/**
+ * Read the full-table scan guard for verify_dedup. Set either to 0 to force a
+ * full-table proof regardless of size.
+ */
+export function readDedupScanGuard(
+  env: NodeJS.ProcessEnv = process.env
+): DedupScanGuard {
+  return {
+    maxScanRows: readNonNegativeInt(
+      env.GOZZLE_DEDUP_MAX_SCAN_ROWS,
+      DEFAULT_MAX_SCAN_ROWS
+    ),
+    maxScanBytes: readNonNegativeInt(
+      env.GOZZLE_DEDUP_MAX_SCAN_BYTES,
+      DEFAULT_MAX_SCAN_BYTES
+    )
+  };
+}
+
+function readNonNegativeInt(
+  value: string | undefined,
+  fallback: number
+): number {
+  if (value === undefined || value.trim() === "") {
+    return fallback;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : fallback;
+}
+
+function formatDedupError(error: unknown): string {
+  const message = formatErrorMessage(error);
+  const base = `Gozzle could not verify deduplication.\n\n${message}`;
+  // A read-limit or timeout abort means the table is too big for a single-pass
+  // proof; steer the caller to the cheaper, scoped path.
+  if (/max_execution_time|TIMEOUT_EXCEEDED|Limit for|too many|memory limit/i.test(message)) {
+    return `${base}\n\nThis table is likely too large to prove in one pass. Re-run verify_dedup with a partitionId to scope to one partition, or create a local slice.`;
+  }
+  return base;
 }
 
 function formatErrorMessage(error: unknown): string {

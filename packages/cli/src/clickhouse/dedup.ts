@@ -12,12 +12,25 @@ export interface VerifyDedupOptions {
   sampleLimit?: number;
   /** Restrict proof to one physical partition, matching local slice scope. */
   partitionId?: string;
+  /**
+   * Refuse a full-table proof above this many rows when no partition is scoped.
+   * 0 disables the guard. Protects against doomed scans on huge tables.
+   */
+  maxScanRows?: number;
+  /** Refuse a full-table proof above this many bytes when unscoped. 0 disables. */
+  maxScanBytes?: number;
 }
 
 export interface DedupSampleRow {
   partitionId: string;
   key: Record<string, unknown>;
   copies: number;
+}
+
+export interface PartitionGuidanceRow {
+  partitionId: string;
+  rows: number;
+  bytes: number;
 }
 
 export interface VerifyDedupResult {
@@ -45,6 +58,13 @@ export interface VerifyDedupResult {
   maxCopies: number;
   sample: DedupSampleRow[];
   warnings: string[];
+  /**
+   * True when the table exceeded the scan guard and no partition was scoped, so
+   * Gozzle returned guidance instead of attempting a doomed full-table proof.
+   */
+  scanSkipped?: boolean;
+  /** Largest partitions to scope to, populated when `scanSkipped` is true. */
+  largestPartitions?: PartitionGuidanceRow[];
 }
 
 interface DedupAggregateRow {
@@ -104,12 +124,36 @@ export async function verifyDedup(
     };
   }
 
+  // A proof requires scanning the data. When the whole table is in scope and it
+  // is too large, refuse rather than launch a scan that will hit
+  // max_execution_time; point the caller at a partition or a local slice.
+  const maxScanRows = options.maxScanRows ?? 0;
+  const maxScanBytes = options.maxScanBytes ?? 0;
+  const overRows = maxScanRows > 0 && inspection.totalRows > maxScanRows;
+  const overBytes = maxScanBytes > 0 && inspection.totalBytes > maxScanBytes;
+  if (!options.partitionId && (overRows || overBytes)) {
+    return {
+      ...base,
+      eligible: true,
+      scanSkipped: true,
+      largestPartitions: await readLargestPartitions(
+        client,
+        inspection.identifier
+      ),
+      reason: `Table is large (${inspection.totalRows} rows, ${inspection.totalBytes} bytes on disk), above the verify_dedup scan guard. Re-run with a partitionId to prove one partition, or create a local slice. Set GOZZLE_DEDUP_MAX_SCAN_ROWS/BYTES=0 to force a full-table scan.`
+    };
+  }
+
   const fullTableName = formatTableIdentifier(inspection.identifier);
   const sortingKey = inspection.sortingKey;
   const sampleLimit = options.sampleLimit ?? DEFAULT_SAMPLE_LIMIT;
   const partitionFilter = options.partitionId
     ? `WHERE _partition_id = ${quoteStringLiteral(options.partitionId)}`
     : "";
+  // When scope is a single partition (unpartitioned table, or an explicit
+  // partitionId), per-partition merges and global FINAL collapse the same rows,
+  // so the expensive global uniqExact scan is redundant.
+  const singleScope = !base.isPartitioned || Boolean(options.partitionId);
 
   // Background merges (and FINAL) collapse rows that share a sorting key within
   // the same partition. Grouping by `_partition_id` plus the sorting key gives
@@ -134,13 +178,17 @@ export async function verifyDedup(
 
   // What `SELECT ... FINAL` would collapse: duplicates by sorting key across the
   // whole scope, ignoring partitions (ClickHouse deduplicates globally by
-  // default, `do_not_merge_across_partitions_select_final=0`).
-  const [globalRow] = await client.queryJson<{ final_dups: string | number }>(`
-    SELECT count() - uniqExact(${sortingKey}) AS final_dups
-    FROM ${fullTableName}
-    ${partitionFilter}
-  `);
-  const finalCollapsibleRows = toNumber(globalRow?.final_dups ?? 0);
+  // default, `do_not_merge_across_partitions_select_final=0`). Within a single
+  // partition this equals `duplicateRows`, so skip the extra scan.
+  let finalCollapsibleRows = duplicateRows;
+  if (!singleScope) {
+    const [globalRow] = await client.queryJson<{ final_dups: string | number }>(`
+      SELECT count() - uniqExact(${sortingKey}) AS final_dups
+      FROM ${fullTableName}
+      ${partitionFilter}
+    `);
+    finalCollapsibleRows = toNumber(globalRow?.final_dups ?? 0);
+  }
 
   const sample =
     duplicateGroups > 0
@@ -200,6 +248,36 @@ async function readSample(
       copies: toNumber((_copies as string | number) ?? 0)
     };
   });
+}
+
+async function readLargestPartitions(
+  client: ClickHouseMetadataClient,
+  identifier: ResolvedTableIdentifier,
+  limit = 10
+): Promise<PartitionGuidanceRow[]> {
+  const rows = await client.queryJson<{
+    partition_id: string;
+    rows: string | number;
+    bytes: string | number;
+  }>(`
+    SELECT
+      partition_id,
+      sum(rows) AS rows,
+      sum(bytes_on_disk) AS bytes
+    FROM system.parts
+    WHERE database = ${quoteStringLiteral(identifier.database)}
+      AND table = ${quoteStringLiteral(identifier.table)}
+      AND active
+    GROUP BY partition_id
+    ORDER BY rows DESC
+    LIMIT ${limit}
+  `);
+
+  return rows.map((row) => ({
+    partitionId: String(row.partition_id),
+    rows: toNumber(row.rows),
+    bytes: toNumber(row.bytes)
+  }));
 }
 
 function quoteStringLiteral(value: string): string {

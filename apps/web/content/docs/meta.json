@@ -1,7 +1,9 @@
 {
   "title": "Documentation",
   "pages": [
+    "---Getting started---",
     "index",
+    "quickstart",
     "---Checks---",
     "verify-dedup",
     "local-slices",

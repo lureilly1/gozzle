@@ -1,0 +1,113 @@
+---
+title: Quickstart
+description: Install Gozzle and run your first proof against ClickHouse in a few minutes
+---
+
+This walks you from zero to your first **verdict with proof** — Gozzle finding (or
+clearing) duplicate rows in a real ClickHouse table. It takes a few minutes.
+
+## Prerequisites
+
+- **Node.js 22+**
+- A **ClickHouse** you can reach, with a user that can run `SELECT` (a read-only
+  user is ideal — Gozzle never needs more)
+- An MCP host: **Claude Code**, **Cursor**, or **Codex**
+
+## 1. Install
+
+```bash
+npm install -g @gozzle/cli@canary
+```
+
+This installs two binaries: `gozzle` (the CLI) and `gozzle-mcp` (the MCP stdio
+server your AI host talks to).
+
+## 2. Configure your AI host
+
+Print the MCP config block for your host and the file it belongs in:
+
+```bash
+gozzle init           # all hosts
+gozzle init claude    # or: cursor, codex
+```
+
+Paste the printed block into the named file, then replace the connection values
+with your ClickHouse details. Use a **read-only** user — Gozzle forces
+[`readonly=2`](/docs/read-only) on every query regardless.
+
+```json
+{
+  "mcpServers": {
+    "gozzle": {
+      "command": "gozzle-mcp",
+      "env": {
+        "GOZZLE_CLICKHOUSE_URL": "https://your-cluster.clickhouse.cloud:8443",
+        "GOZZLE_CLICKHOUSE_USER": "gozzle_readonly",
+        "GOZZLE_CLICKHOUSE_PASSWORD": "your-password",
+        "GOZZLE_CLICKHOUSE_DATABASE": "default"
+      }
+    }
+  }
+}
+```
+
+Restart your AI host so it picks up the new server.
+
+## 3. Connect
+
+Ask your agent to run the `connect` tool, or just say:
+
+> Use gozzle to connect to my ClickHouse.
+
+You should see the connection confirmed, with read-only enforcement reported:
+
+```text
+Connected read-only check complete.
+No data leaves this machine.
+
+Read-only enforced by Gozzle: yes (readonly=2)
+```
+
+## 4. Inspect a table
+
+Point Gozzle at a table to see its physical layout and which checks it is
+eligible for:
+
+> Inspect the table `analytics.events` with gozzle.
+
+`inspect_table` reports the engine, sorting/partition keys, parts, and row
+counts — and tells you whether the table can be checked with
+[`verify_dedup`](/docs/verify-dedup).
+
+## 5. Prove it — `verify_dedup`
+
+For a `ReplacingMergeTree`-family table, ask:
+
+> Use gozzle to verify whether `analytics.events` has duplicate rows.
+
+Gozzle counts rows by sorting key within each partition — the exact scope in
+which ClickHouse collapses rows under `FINAL` — and returns a verdict plus
+evidence:
+
+```text
+x 2.4M duplicate rows currently visible without FINAL
+
+Table: analytics.events
+Engine: ReplacingMergeTree(version)
+Affected sorting keys: 184,203
+Risk: dashboards querying without FINAL may overcount
+```
+
+That is the proof moment: a claim a plain `SELECT count()` can't make, backed by
+ClickHouse's own semantics.
+
+## Where to go next
+
+- [`dry_run_migration`](/docs/dry-run-migration) — classify an `ALTER` and
+  estimate what it will rewrite, without running it.
+- [`diagnose_query`](/docs/diagnose-query) — prove partition and primary-key
+  pruning with `EXPLAIN`.
+- [`create_local_slice`](/docs/local-slices) — copy one partition into a local
+  chDB workspace to reproduce findings offline.
+- [Read-only enforcement](/docs/read-only) and [cost guardrails](/docs/guardrails)
+  — how Gozzle stays safe on a production cluster.

@@ -151,6 +151,125 @@ test("verify_dedup distinguishes merge vs FINAL on partitioned tables", async ()
   assert.match(output, /cross-partition duplicates that background merges never remove/);
 });
 
+class TrackingFakeMetadataClient implements ClickHouseMetadataClient {
+  readonly queries: string[] = [];
+
+  constructor(private readonly responses: Record<string, unknown[]>) {}
+
+  async ping(): Promise<boolean> {
+    return true;
+  }
+
+  async queryJson<T>(query: string): Promise<T[]> {
+    this.queries.push(query);
+    const key = Object.keys(this.responses).find((candidate) =>
+      query.includes(candidate)
+    );
+    return (key ? this.responses[key] : []) as T[];
+  }
+
+  async close(): Promise<void> {}
+}
+
+test("verify_dedup skips the global FINAL scan on an unpartitioned table", async () => {
+  const client = new TrackingFakeMetadataClient(
+    replacingTableResponses({
+      duplicate_rows: [
+        { duplicate_groups: "1", duplicate_rows: "2", max_copies: "3" }
+      ],
+      "AS _copies": [{ _partition_id: "all", id: "a", _copies: "3" }]
+    })
+  );
+
+  const result = await verifyDedup(client, {
+    table: "analytics.events",
+    defaultDatabase: "default"
+  });
+
+  // Single scope: FINAL collapse equals the per-partition floor without the
+  // expensive global uniqExact scan.
+  assert.equal(result.finalCollapsibleRows, result.duplicateRows);
+  assert.equal(result.duplicateRows, 2);
+  assert.ok(
+    !client.queries.some((query) => query.includes("count() - uniqExact")),
+    "no global FINAL scan should run for an unpartitioned table"
+  );
+});
+
+test("verify_dedup skips the global FINAL scan when a partition is scoped", async () => {
+  const client = new TrackingFakeMetadataClient(
+    replacingTableResponses(
+      {
+        duplicate_rows: [
+          { duplicate_groups: "1", duplicate_rows: "1", max_copies: "2" }
+        ],
+        "AS _copies": [{ _partition_id: "1", id: "1", _copies: "2" }]
+      },
+      partitionedCreate,
+      "p"
+    )
+  );
+
+  const result = await verifyDedup(client, {
+    table: "analytics.events",
+    defaultDatabase: "default",
+    partitionId: "1"
+  });
+
+  assert.equal(result.finalCollapsibleRows, result.duplicateRows);
+  assert.ok(
+    !client.queries.some((query) => query.includes("count() - uniqExact")),
+    "no global FINAL scan should run when a partition is scoped"
+  );
+  assert.ok(
+    client.queries.some((query) => query.includes("_partition_id = '1'")),
+    "the proof should be scoped to the requested partition"
+  );
+});
+
+test("verify_dedup refuses an oversized unscoped table and lists partitions", async () => {
+  const client = new TrackingFakeMetadataClient({
+    "SHOW CREATE TABLE": [{ statement: partitionedCreate }],
+    "FROM system.tables": [
+      {
+        engine: "ReplacingMergeTree",
+        engine_full: "ReplacingMergeTree(version)",
+        sorting_key: "id",
+        primary_key: "id",
+        partition_key: "p",
+        total_rows: "5000",
+        total_bytes: "5000"
+      }
+    ],
+    "FROM system.columns": [],
+    active_parts: [
+      { active_parts: "3", rows: "5000", bytes_on_disk: "5000", partitions: "2" }
+    ],
+    "rows DESC": [
+      { partition_id: "202401", rows: "3000", bytes: "3000" },
+      { partition_id: "202402", rows: "2000", bytes: "2000" }
+    ]
+  });
+
+  const result = await verifyDedup(client, {
+    table: "analytics.events",
+    defaultDatabase: "default",
+    maxScanRows: 1000
+  });
+
+  assert.equal(result.scanSkipped, true);
+  assert.equal(result.largestPartitions?.length, 2);
+  assert.equal(result.largestPartitions?.[0].partitionId, "202401");
+  assert.ok(
+    !client.queries.some((query) => query.includes("GROUP BY _partition_id")),
+    "no full-table proof scan should run when the guard refuses"
+  );
+
+  const output = formatDedupResult(result);
+  assert.match(output, /too large to prove in one pass/);
+  assert.match(output, /202401 \(3000 rows, 3000 bytes\)/);
+});
+
 test("verify_dedup is not eligible for non-replacing engines", async () => {
   const client = new FakeMetadataClient({
     "SHOW CREATE TABLE": [
