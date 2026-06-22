@@ -45,7 +45,7 @@ jobs:
         run: npm ci
 
       - name: Set version
-        run: npm version "${{ steps.version.outputs.value }}" --no-git-tag-version -w @gozzle/cli
+        run: npm version "${{ steps.version.outputs.value }}" --no-git-tag-version --allow-same-version -w @gozzle/cli
 
       - name: Build
         run: npm run build -w @gozzle/cli
