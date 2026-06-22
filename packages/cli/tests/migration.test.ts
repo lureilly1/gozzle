@@ -95,7 +95,9 @@ test("metadata-only dry run reports zero physical rewrite", async () => {
   assert.equal(result.rewrite.affectedParts, 0);
   assert.equal(result.productionExecuted, false);
   assert.equal(client.queries.some((query) => query.includes("INNER JOIN")), false);
-  assert.match(formatMigrationResult(result), /no existing data-part rewrite expected/);
+  const text = formatMigrationResult(result);
+  assert.match(text, /Status: PASS/);
+  assert.match(text, /no existing data-part rewrite expected/);
 });
 
 test("MODIFY COLUMN uses table metadata as a full-table upper bound", async () => {
@@ -122,7 +124,9 @@ test("predicate mutation estimates matching rows and full touched parts", async 
   const estimateQuery = client.queries.find((query) => query.includes("INNER JOIN"));
   assert.match(estimateQuery ?? "", /WHERE \(id = 42\)/);
   assert.match(estimateQuery ?? "", /GROUP BY _part/);
-  assert.match(formatMigrationResult(result), /1.00 MiB/);
+  const text = formatMigrationResult(result);
+  assert.match(text, /Status: REVIEW/);
+  assert.match(text, /1.00 MiB/);
 });
 
 test("unsupported operation makes no rewrite claim", async () => {

@@ -10,6 +10,7 @@ import {
   validateDiagnosticQuery,
   type ValidatedQuery
 } from "./query-validator.js";
+import { inspectTable } from "./table-inspection.js";
 
 export interface QueryFinding {
   confidence: "proven" | "advisory";
@@ -20,16 +21,25 @@ export interface QueryFinding {
   recommendation: string;
 }
 
+/** Key layout for a table the query reads, so a fix can be made concrete. */
+export interface QueryTableSchema {
+  table: string;
+  orderBy?: string;
+  partitionBy?: string;
+}
+
 export interface DiagnoseQueryResult {
   query: ValidatedQuery;
   explain: ExplainEvidence;
+  tableSchemas: QueryTableSchema[];
   findings: QueryFinding[];
   originalQueryExecuted: false;
 }
 
 export async function diagnoseQuery(
   client: ClickHouseMetadataClient,
-  query: string
+  query: string,
+  defaultDatabase = "default"
 ): Promise<DiagnoseQueryResult> {
   const validated = validateDiagnosticQuery(query);
   const rows = await client.queryJson<ExplainRow>(`
@@ -37,21 +47,70 @@ export async function diagnoseQuery(
     ${validated.query}
   `);
   const explain = parseExplainRows(rows);
+  const tableSchemas = await readTableSchemas(
+    client,
+    explain.tables,
+    defaultDatabase
+  );
   const findings = [
-    ...explain.tables.flatMap(diagnoseTable),
+    ...explain.tables.flatMap((table) =>
+      diagnoseTable(
+        table,
+        tableSchemas.find((schema) => schema.table === table.table)
+      )
+    ),
     ...buildAdvisories(validated, explain)
   ];
 
   return {
     query: validated,
     explain,
+    tableSchemas,
     findings,
     originalQueryExecuted: false
   };
 }
 
-function diagnoseTable(table: TableExplainEvidence): QueryFinding[] {
+/**
+ * Fetch the ORDER BY / PARTITION BY for each table the plan reads, so findings
+ * can name the actual keys. Best-effort: a table that can't be inspected (CTE,
+ * non-MergeTree, missing) simply has no schema attached.
+ */
+async function readTableSchemas(
+  client: ClickHouseMetadataClient,
+  tables: TableExplainEvidence[],
+  defaultDatabase: string
+): Promise<QueryTableSchema[]> {
+  const schemas: QueryTableSchema[] = [];
+  for (const table of tables) {
+    try {
+      const inspection = await inspectTable(client, {
+        table: table.table,
+        defaultDatabase
+      });
+      schemas.push({
+        table: table.table,
+        orderBy: inspection.orderBy ?? inspection.sortingKey,
+        partitionBy: inspection.partitionBy
+      });
+    } catch {
+      schemas.push({ table: table.table });
+    }
+  }
+  return schemas;
+}
+
+function diagnoseTable(
+  table: TableExplainEvidence,
+  schema?: QueryTableSchema
+): QueryFinding[] {
   const findings: QueryFinding[] = [];
+  const orderByHint = schema?.orderBy
+    ? ` This table's ORDER BY is (${schema.orderBy}).`
+    : "";
+  const partitionHint = schema?.partitionBy
+    ? ` This table's PARTITION BY is (${schema.partitionBy}).`
+    : "";
   const minMax = findIndex(table, "MinMax");
   const partition = findIndex(table, "Partition");
   const primary = findIndex(table, "PrimaryKey");
@@ -71,7 +130,7 @@ function diagnoseTable(table: TableExplainEvidence): QueryFinding[] {
       message: `${table.table} scans every reported part and granule.`,
       evidence: `parts ${formatRatio(baseParts)}, granules ${formatRatio(finalGranules)}`,
       recommendation:
-        "Align filters with the partition or leading ORDER BY keys, or evaluate a projection for this access pattern."
+        `Align filters with the partition or leading ORDER BY keys, or evaluate a projection for this access pattern.${partitionHint}${orderByHint}`
     });
   }
 
@@ -88,7 +147,7 @@ function diagnoseTable(table: TableExplainEvidence): QueryFinding[] {
       message: `${table.table} received no partition pruning.`,
       evidence: `Partition Condition: true; parts ${formatRatio(partition.parts)}`,
       recommendation:
-        "Filter on the partition expression with a compatible range when the query should target fewer partitions."
+        `Filter on the partition expression with a compatible range when the query should target fewer partitions.${partitionHint}`
     });
   }
 
@@ -105,7 +164,7 @@ function diagnoseTable(table: TableExplainEvidence): QueryFinding[] {
       message: `${table.table} received no primary-key granule pruning.`,
       evidence: `PrimaryKey Condition: true; granules ${formatRatio(primary.granules)}`,
       recommendation:
-        "Filter on a useful prefix of the ORDER BY key without wrapping key columns in incompatible functions."
+        `Filter on a useful prefix of the ORDER BY key without wrapping key columns in incompatible functions.${orderByHint}`
     });
   }
 

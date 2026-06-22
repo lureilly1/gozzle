@@ -24,6 +24,28 @@ export function createDiagnoseQueryTool(server: McpServer): void {
           .string()
           .min(1)
           .describe("One ClickHouse SELECT or WITH ... SELECT query to diagnose.")
+      },
+      outputSchema: {
+        status: z.enum(["pass", "warn", "fail"]),
+        originalQueryExecuted: z.literal(false),
+        tables: z.array(
+          z.object({
+            table: z.string(),
+            orderBy: z.string().optional(),
+            partitionBy: z.string().optional()
+          })
+        ),
+        findings: z.array(
+          z.object({
+            confidence: z.enum(["proven", "advisory"]),
+            severity: z.enum(["high", "medium", "low"]),
+            code: z.string(),
+            message: z.string(),
+            evidence: z.string().optional(),
+            recommendation: z.string()
+          })
+        ),
+        queryFingerprint: z.string()
       }
     },
     async ({ query }) =>
@@ -35,9 +57,10 @@ export function createDiagnoseQueryTool(server: McpServer): void {
           try {
             const config = readClickHouseConfig();
             client = new ClickHouseHttpMetadataClient(config);
-            const result = await diagnoseQuery(client, query);
+            const result = await diagnoseQuery(client, query, config.database ?? "default");
             return {
-              content: [{ type: "text", text: formatQueryDiagnosis(result) }]
+              content: [{ type: "text", text: formatQueryDiagnosis(result) }],
+              structuredContent: buildDiagnosisStructured(result)
             };
           } catch (error) {
             return {
@@ -67,16 +90,18 @@ export function formatQueryDiagnosis(result: DiagnoseQueryResult): string {
     (finding) => finding.confidence === "advisory"
   );
   const lines = [
-    `Query fingerprint: ${fingerprint(result.query.query)}`,
-    "Original query execution: not run (EXPLAIN only)",
-    "",
-    `Verdict: ${formatVerdict(proven, advisory)}`
+    `Status: ${queryStatus(proven, advisory)}`,
+    `Verdict: ${formatVerdict(proven, advisory)}`,
+    "Original query execution: not run (EXPLAIN only)"
   ];
 
   if (result.explain.tables.length > 0) {
     lines.push("", "EXPLAIN evidence:");
     for (const table of result.explain.tables) {
       lines.push(`- ${table.table}`);
+      const schema = result.tableSchemas.find((s) => s.table === table.table);
+      if (schema?.orderBy) lines.push(`  ORDER BY: ${schema.orderBy}`);
+      if (schema?.partitionBy) lines.push(`  PARTITION BY: ${schema.partitionBy}`);
       for (const index of table.indexes) {
         const details = [
           index.condition ? `condition=${index.condition}` : undefined,
@@ -94,7 +119,30 @@ export function formatQueryDiagnosis(result: DiagnoseQueryResult): string {
 
   appendFindings(lines, "Proven findings", proven);
   appendFindings(lines, "Advisories", advisory);
+  lines.push("", `Query fingerprint: ${fingerprint(result.query.query)}`);
   return lines.join("\n");
+}
+
+export function buildDiagnosisStructured(result: DiagnoseQueryResult) {
+  const proven = result.findings.filter((f) => f.confidence === "proven");
+  const advisory = result.findings.filter((f) => f.confidence === "advisory");
+  return {
+    status: proven.length > 0 ? "fail" : advisory.length > 0 ? "warn" : "pass",
+    originalQueryExecuted: false as const,
+    tables: result.tableSchemas,
+    findings: result.findings,
+    queryFingerprint: fingerprint(result.query.query)
+  };
+}
+
+function queryStatus(proven: QueryFinding[], advisory: QueryFinding[]): string {
+  if (proven.length > 0) {
+    return `FAIL — ${proven.length} proven pruning issue(s)`;
+  }
+  if (advisory.length > 0) {
+    return `WARN — ${advisory.length} advisory finding(s), none proven`;
+  }
+  return "PASS — no pruning problem found";
 }
 
 function formatVerdict(

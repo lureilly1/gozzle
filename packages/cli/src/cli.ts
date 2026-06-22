@@ -4,6 +4,7 @@ import { readPackageMetadata } from "./shared/package-metadata.js";
 import { readLocalSliceConfig } from "./config/local-slice.js";
 import { cleanLocalSlices, listLocalSlices } from "./local-engine/slice-store.js";
 import { isHostId, renderInit } from "./init/mcp-config.js";
+import { runVerifyCommand } from "./commands/verify.js";
 
 const metadata = readPackageMetadata();
 const command = process.argv[2] ?? "help";
@@ -22,6 +23,11 @@ if (command === "init") {
   process.exit(0);
 }
 
+if (command === "verify") {
+  const code = await runVerifyCommand(process.argv.slice(3));
+  process.exit(code);
+}
+
 if (command === "slices") {
   await runSlicesCommand(process.argv.slice(3));
   process.exit(0);
@@ -30,6 +36,7 @@ if (command === "slices") {
 console.log(`gozzle ${metadata.version}`);
 console.log("");
 console.log("Commands:");
+console.log("  gozzle verify <file> Verify a query or migration file (exit 1 on findings)");
 console.log("  gozzle init [host] Print MCP config (host: claude, cursor, codex)");
 console.log("  gozzle slices      List and clean local slice workspaces");
 console.log("  gozzle version     Print the CLI version");

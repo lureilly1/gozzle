@@ -32,6 +32,19 @@ export function createVerifyDedupTool(server: McpServer): void {
           .describe(
             "Scope the proof to one physical partition id (from inspect_table). Use this for large tables."
           )
+      },
+      outputSchema: {
+        eligible: z.boolean(),
+        scanSkipped: z.boolean(),
+        table: z.string(),
+        engine: z.string(),
+        isPartitioned: z.boolean(),
+        totalRows: z.number(),
+        duplicateGroups: z.number(),
+        duplicateRows: z.number(),
+        finalCollapsibleRows: z.number(),
+        maxCopies: z.number(),
+        reason: z.string().optional()
       }
     },
     async ({ table, sampleLimit, partitionId }) =>
@@ -55,7 +68,8 @@ export function createVerifyDedupTool(server: McpServer): void {
             });
 
             return {
-              content: [{ type: "text", text: formatDedupResult(result) }]
+              content: [{ type: "text", text: formatDedupResult(result) }],
+              structuredContent: buildDedupStructured(result)
             };
           } catch (error) {
             return {
@@ -73,6 +87,22 @@ export function createVerifyDedupTool(server: McpServer): void {
         }
       )
   );
+}
+
+export function buildDedupStructured(result: VerifyDedupResult) {
+  return {
+    eligible: result.eligible,
+    scanSkipped: result.scanSkipped ?? false,
+    table: `${result.identifier.database}.${result.identifier.table}`,
+    engine: result.engine,
+    isPartitioned: result.isPartitioned,
+    totalRows: result.totalRows,
+    duplicateGroups: result.duplicateGroups,
+    duplicateRows: result.duplicateRows,
+    finalCollapsibleRows: result.finalCollapsibleRows,
+    maxCopies: result.maxCopies,
+    ...(result.reason ? { reason: result.reason } : {})
+  };
 }
 
 export function formatDedupResult(result: VerifyDedupResult): string {

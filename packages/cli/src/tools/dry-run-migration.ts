@@ -8,6 +8,7 @@ import {
   type DryRunMigrationResult
 } from "../clickhouse/migration.js";
 import { readClickHouseConfig } from "../config/clickhouse.js";
+import { formatBytes, formatCount } from "../shared/format.js";
 import { runAuditedTool } from "../shared/audit.js";
 
 export function createDryRunMigrationTool(server: McpServer): void {
@@ -22,6 +23,25 @@ export function createDryRunMigrationTool(server: McpServer): void {
           .string()
           .min(1)
           .describe("One ClickHouse ALTER TABLE statement to assess.")
+      },
+      outputSchema: {
+        status: z.enum(["pass", "review", "unknown"]),
+        classification: z.string(),
+        table: z.string(),
+        productionExecuted: z.literal(false),
+        footprint: z.object({
+          rows: z.number(),
+          activeParts: z.number(),
+          bytesOnDisk: z.number()
+        }),
+        rewrite: z.object({
+          matchingRows: z.number(),
+          affectedPartRows: z.number(),
+          affectedParts: z.number(),
+          affectedBytes: z.number(),
+          evidence: z.string()
+        }),
+        statementSha256: z.string()
       }
     },
     async ({ statement }) =>
@@ -38,7 +58,8 @@ export function createDryRunMigrationTool(server: McpServer): void {
               defaultDatabase: config.database ?? "default"
             });
             return {
-              content: [{ type: "text", text: formatMigrationResult(result) }]
+              content: [{ type: "text", text: formatMigrationResult(result) }],
+              structuredContent: buildMigrationStructured(result)
             };
           } catch (error) {
             return {
@@ -63,6 +84,7 @@ export function createDryRunMigrationTool(server: McpServer): void {
 export function formatMigrationResult(result: DryRunMigrationResult): string {
   const { parsed, footprint, rewrite } = result;
   const lines = [
+    `Status: ${migrationStatus(parsed.classification)}`,
     `Table: ${result.identifier.database}.${result.identifier.table}`,
     `Engine: ${result.engine}`,
     `Classification: ${parsed.classification}`,
@@ -72,19 +94,19 @@ export function formatMigrationResult(result: DryRunMigrationResult): string {
     parsed.reason,
     "",
     "Current table footprint:",
-    `- rows: ${footprint.rows}`,
-    `- active parts: ${footprint.activeParts}`,
-    `- compressed bytes: ${footprint.bytesOnDisk}`
+    `- rows: ${formatCount(footprint.rows)}`,
+    `- active parts: ${formatCount(footprint.activeParts)}`,
+    `- compressed size: ${formatBytes(footprint.bytesOnDisk)}`
   ];
 
   if (parsed.classification !== "unsupported") {
     lines.push(
       "",
       "Estimated physical rewrite:",
-      `- matching rows: ${rewrite.matchingRows}`,
-      `- rows in touched parts: ${rewrite.affectedPartRows}`,
-      `- touched parts: ${rewrite.affectedParts}`,
-      `- compressed bytes in touched parts: ${rewrite.affectedBytes}`,
+      `- matching rows: ${formatCount(rewrite.matchingRows)}`,
+      `- rows in touched parts: ${formatCount(rewrite.affectedPartRows)}`,
+      `- touched parts: ${formatCount(rewrite.affectedParts)}`,
+      `- compressed size of touched parts: ${formatBytes(rewrite.affectedBytes)}`,
       `- evidence: ${rewrite.evidence}`
     );
   }
@@ -107,21 +129,37 @@ function migrationVerdict(result: DryRunMigrationResult): string {
   if (rewrite.affectedParts === 0) {
     return "no currently active parts match the proposed mutation.";
   }
-  return `${rewrite.affectedParts} active part(s), containing ${rewrite.affectedPartRows} row(s) and ${formatBytes(
-    rewrite.affectedBytes
-  )}, may be rewritten.`;
+  return `${formatCount(rewrite.affectedParts)} active part(s), containing ${formatCount(
+    rewrite.affectedPartRows
+  )} row(s) and ${formatBytes(rewrite.affectedBytes)}, may be rewritten.`;
 }
 
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  const units = ["KiB", "MiB", "GiB", "TiB", "PiB"];
-  let value = bytes;
-  let unit = -1;
-  do {
-    value /= 1024;
-    unit += 1;
-  } while (value >= 1024 && unit < units.length - 1);
-  return `${value.toFixed(value >= 10 ? 1 : 2)} ${units[unit]}`;
+export function buildMigrationStructured(result: DryRunMigrationResult) {
+  const classification = result.parsed.classification;
+  return {
+    status:
+      classification === "metadata-only"
+        ? ("pass" as const)
+        : classification === "unsupported"
+          ? ("unknown" as const)
+          : ("review" as const),
+    classification,
+    table: `${result.identifier.database}.${result.identifier.table}`,
+    productionExecuted: false as const,
+    footprint: result.footprint,
+    rewrite: result.rewrite,
+    statementSha256: fingerprint(result.parsed.statement)
+  };
+}
+
+function migrationStatus(classification: string): string {
+  if (classification === "metadata-only") {
+    return "PASS — metadata-only, no part rewrite";
+  }
+  if (classification === "unsupported") {
+    return "UNKNOWN — could not classify; review manually";
+  }
+  return "REVIEW — may rewrite existing data parts";
 }
 
 function formatErrorMessage(error: unknown): string {
