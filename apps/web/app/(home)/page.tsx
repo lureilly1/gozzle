@@ -3,34 +3,34 @@
 import Link from 'next/link';
 import styles from './home.module.css';
 import { C, GITHUB_URL, mono } from './theme';
-import { InstallBar, SiteFooter, SiteNav, TitleBar } from './chrome';
+import { InstallBar, SiteNav, TitleBar } from './chrome';
 
-const HEADLINE = 'The ClickHouse brain for your AI agent';
+const HEADLINE = 'Your AI agent says it’s fine. gozzle proves it.';
 
 const SUBHEAD =
-  'gozzle learns your cluster, sharpens your queries, and tests your migrations ' +
-  'against a faithful local slice of prod. An agent harness for ClickHouse, ' +
-  'inside your own AI.';
+  'gozzle is a read-only test harness for ClickHouse queries and migrations. It ' +
+  'runs locally against your real schema and data shape, proving whether a change ' +
+  'is safe before your agent, PR, or migration ships it.';
 
 const STEPS = [
-  'install the gozzle MCP server',
-  'connect read-only to your ClickHouse',
-  'ask Claude to verify a query or migration — see it proven',
+  'install the gozzle CLI + MCP server',
+  'point it at your ClickHouse, read-only',
+  'verify a changed query or migration — get proof, not a guess',
 ];
 
 const CATCHES: Array<{ text: string; muted?: string }> = [
-  { text: 'ReplacingMergeTree duplicates', muted: '(without FINAL)' },
-  { text: 'Materialized views that silently drop rows' },
+  { text: 'Queries that read ReplacingMergeTree', muted: 'as if it were deduplicated' },
   { text: 'Migrations that trigger multi-hour mutations' },
-  { text: 'Queries scanning the whole table' },
-  { text: 'Aggregates wrong from missing State/Merge' },
+  { text: 'Queries scanning far more data than expected' },
+  { text: 'Missed partition or primary-key pruning' },
+  { text: 'Materialized views that silently drop rows' },
 ];
 
 const REASONS = [
-  'Runs against your real schema and data shape',
-  'Builds local proof before changes ship',
-  'Keeps data, queries, and schemas on your machine',
-  'Fits into AI coding tools and CI',
+  'Proves changes against your real schema and data shape',
+  'Runs locally, read-only — no data leaves your machine',
+  'Works in your agent, your terminal, and your CI',
+  'Free and open source',
 ];
 
 export default function HomePage() {
@@ -83,8 +83,6 @@ export default function HomePage() {
 
           <InstallBar />
         </div>
-
-        <SiteFooter />
       </div>
     </div>
   );
@@ -128,7 +126,7 @@ function PitchColumn() {
           letterSpacing: '.3px',
         }}
       >
-        // get started in 3 steps
+        // verify a change in 3 steps
       </div>
       <div
         style={{
@@ -162,7 +160,7 @@ function PitchColumn() {
           href="/docs/quickstart"
           style={{ color: C.text, textDecoration: 'none', fontSize: 13 }}
         >
-          <span style={{ color: C.amber }}>↳ 1 /</span>&nbsp;get started
+          <span style={{ color: C.amber }}>↳ 1 /</span>&nbsp;run your first check
         </Link>
         <a
           href={GITHUB_URL}
@@ -348,7 +346,7 @@ function ProofColumn() {
             marginBottom: 12,
           }}
         >
-          why engineers run Gozzle
+          why engineers run gozzle
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
           {REASONS.map((reason) => (

@@ -1,16 +1,16 @@
 ---
 title: Quickstart
-description: Install Gozzle and run your first proof against ClickHouse in a few minutes
+description: Install gozzle and run your first proof against ClickHouse in a few minutes
 ---
 
-This walks you from zero to your first **verdict with proof** — Gozzle finding (or
+This walks you from zero to your first **verdict with proof** — gozzle finding (or
 clearing) duplicate rows in a real ClickHouse table. It takes a few minutes.
 
 ## Prerequisites
 
 - **Node.js 22+**
 - A **ClickHouse** you can reach, with a user that can run `SELECT` (a read-only
-  user is ideal — Gozzle never needs more)
+  user is ideal — gozzle never needs more)
 - An MCP host: **Claude Code**, **Cursor**, or **Codex**
 
 ## 1. Install
@@ -32,7 +32,7 @@ gozzle init claude    # or: cursor, codex
 ```
 
 Paste the printed block into the named file, then replace the connection values
-with your ClickHouse details. Use a **read-only** user — Gozzle forces
+with your ClickHouse details. Use a **read-only** user — gozzle forces
 [`readonly=2`](/docs/read-only) on every query regardless.
 
 ```json
@@ -65,12 +65,12 @@ You should see the connection confirmed, with read-only enforcement reported:
 Connected read-only check complete.
 No data leaves this machine.
 
-Read-only enforced by Gozzle: yes (readonly=2)
+Read-only enforced by gozzle: yes (readonly=2)
 ```
 
 ## 4. Inspect a table
 
-Point Gozzle at a table to see its physical layout and which checks it is
+Point gozzle at a table to see its physical layout and which checks it is
 eligible for:
 
 > Inspect the table `analytics.events` with gozzle.
@@ -85,7 +85,7 @@ For a `ReplacingMergeTree`-family table, ask:
 
 > Use gozzle to verify whether `analytics.events` has duplicate rows.
 
-Gozzle counts rows by sorting key within each partition — the exact scope in
+gozzle counts rows by sorting key within each partition — the exact scope in
 which ClickHouse collapses rows under `FINAL` — and returns a verdict plus
 evidence:
 
@@ -110,4 +110,4 @@ ClickHouse's own semantics.
 - [`create_local_slice`](/docs/local-slices) — copy one partition into a local
   chDB workspace to reproduce findings offline.
 - [Read-only enforcement](/docs/read-only) and [cost guardrails](/docs/guardrails)
-  — how Gozzle stays safe on a production cluster.
+  — how gozzle stays safe on a production cluster.

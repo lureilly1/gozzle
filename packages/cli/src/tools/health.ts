@@ -7,7 +7,7 @@ export function createHealthTool(server: McpServer): void {
     "health",
     {
       title: "Health Check",
-      description: "Confirm the Gozzle MCP server is running.",
+      description: "Confirm the gozzle MCP server is running.",
       inputSchema: {}
     },
     async () =>
@@ -15,7 +15,7 @@ export function createHealthTool(server: McpServer): void {
         content: [
           {
             type: "text",
-            text: "Gozzle MCP server is running."
+            text: "gozzle MCP server is running."
           }
         ]
       }))

@@ -12,7 +12,7 @@ export interface ClickHouseConnectionInfo {
   currentUser: string;
   hostName: string;
   deployment: "cloud" | "self_hosted_or_unknown";
-  /** Whether Gozzle enforces a read-only session on every query. */
+  /** Whether gozzle enforces a read-only session on every query. */
   readonlyEnforced: boolean;
   /** Effective `readonly` value observed on the connection (proof). */
   effectiveReadonly?: string;
@@ -75,7 +75,7 @@ export async function inspectClickHouseConnection(
 
   if (!guardrails.enforceReadonly) {
     warnings.push(
-      "Gozzle read-only enforcement is disabled (GOZZLE_ENFORCE_READONLY=false). Queries are not forced read-only."
+      "gozzle read-only enforcement is disabled (GOZZLE_ENFORCE_READONLY=false). Queries are not forced read-only."
     );
   }
 
@@ -83,7 +83,7 @@ export async function inspectClickHouseConnection(
     warnings.push(
       `Connected user has write-capable grants: ${writePrivileges.join(
         ", "
-      )}. Gozzle never writes, but a least-privilege read-only user is recommended.`
+      )}. gozzle never writes, but a least-privilege read-only user is recommended.`
     );
   }
 

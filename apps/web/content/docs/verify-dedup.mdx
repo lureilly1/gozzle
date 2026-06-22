@@ -16,7 +16,7 @@ worst-offending keys.
 
 Ask your AI client:
 
-> Use Gozzle to verify deduplication on `analytics.events`.
+> Use gozzle to verify deduplication on `analytics.events`.
 
 Parameters:
 
@@ -43,7 +43,7 @@ Sample duplicated keys:
 ## Merge vs FINAL on partitioned tables
 
 Two operations remove duplicates, and on a partitioned table they remove
-**different** numbers of rows — so Gozzle reports both:
+**different** numbers of rows — so gozzle reports both:
 
 - **Background merges** run *per partition*. Duplicates sharing a sorting key
   within one partition are collapsed; identical keys in different partitions are
@@ -63,7 +63,7 @@ Notes:
 
 <Callout title="Why this matters">
 A naive `count()` over-counts duplicates; a single per-partition number
-under-counts what a user sees from `FINAL`. Gozzle reports both, so you know the
+under-counts what a user sees from `FINAL`. gozzle reports both, so you know the
 storage floor and the query-time result. For a non-partitioned table the two are
 equal and the verdict collapses to one line.
 </Callout>
@@ -76,5 +76,5 @@ equal and the verdict collapses to one line.
 - the table is not `Distributed` (run it against the local table on each shard), and
 - the table has a sorting key.
 
-For ineligible tables, Gozzle returns a clear reason instead of a misleading
+For ineligible tables, gozzle returns a clear reason instead of a misleading
 count.

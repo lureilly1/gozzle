@@ -8,7 +8,7 @@ import type { LocalEngine, LocalReplayInput } from "./types.js";
 
 // chDB ships a native addon that is compiled/downloaded at install time and only
 // supports linux/macOS on x86_64/arm64. It is an optional dependency, so import
-// it lazily: the rest of Gozzle (and the MCP server) must work even where chDB
+// it lazily: the rest of gozzle (and the MCP server) must work even where chDB
 // cannot be installed.
 async function loadChdbSession(): Promise<typeof import("chdb").Session> {
   try {

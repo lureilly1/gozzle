@@ -57,7 +57,7 @@ export function createLocalSliceTool(server: McpServer): void {
             content: [
               {
                 type: "text",
-                text: `Gozzle could not create a local slice.\n\n${formatErrorMessage(
+                text: `gozzle could not create a local slice.\n\n${formatErrorMessage(
                   error
                 )}`
               }

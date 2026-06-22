@@ -1,11 +1,11 @@
 ---
 title: Audit log
-description: Optionally record every Gozzle tool call to a local file for review
+description: Optionally record every gozzle tool call to a local file for review
 ---
 
-Gozzle can keep a local, append-only record of every tool call it handles. The
+gozzle can keep a local, append-only record of every tool call it handles. The
 audit log is **opt-in and local** — nothing leaves your machine — so you can
-review exactly what the AI client asked Gozzle to do.
+review exactly what the AI client asked gozzle to do.
 
 ## Enabling
 
@@ -31,7 +31,7 @@ When the variable is unset, auditing is off and has no effect.
 One JSON object per line (JSON Lines), one line per tool call:
 
 ```json
-{"timestamp":"2026-06-20T10:19:53.920Z","tool":"health","arguments":{},"outcome":"ok","durationMs":1,"summary":"Gozzle MCP server is running."}
+{"timestamp":"2026-06-20T10:19:53.920Z","tool":"health","arguments":{},"outcome":"ok","durationMs":1,"summary":"gozzle MCP server is running."}
 {"timestamp":"2026-06-20T10:19:54.155Z","tool":"inspect_table","arguments":{"table":"nyc_taxi.trips"},"outcome":"ok","durationMs":232,"summary":"Table: nyc_taxi.trips"}
 ```
 

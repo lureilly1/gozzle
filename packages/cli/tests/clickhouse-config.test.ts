@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { readClickHouseConfig } from "../src/config/clickhouse.js";
 
-test("reads Gozzle-prefixed ClickHouse config first", () => {
+test("reads gozzle-prefixed ClickHouse config first", () => {
   const config = readClickHouseConfig({
     CLICKHOUSE_URL: "http://localhost:8123",
     CLICKHOUSE_USER: "default",

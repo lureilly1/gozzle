@@ -1,4 +1,4 @@
-# Gozzle Quality & Hardening Plan
+# gozzle Quality & Hardening Plan
 
 Follow-on from the codebase review. Scope: make the existing tools trustworthy on
 real production tables before beta. P0 items are the focus; P1/P2 are the backlog.

@@ -211,7 +211,7 @@ function readNonNegativeInt(
 
 function formatDedupError(error: unknown): string {
   const message = formatErrorMessage(error);
-  const base = `Gozzle could not verify deduplication.\n\n${message}`;
+  const base = `gozzle could not verify deduplication.\n\n${message}`;
   // A read-limit or timeout abort means the table is too big for a single-pass
   // proof; steer the caller to the cheaper, scoped path.
   if (/max_execution_time|TIMEOUT_EXCEEDED|Limit for|too many|memory limit/i.test(message)) {

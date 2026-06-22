@@ -60,7 +60,7 @@ export interface VerifyDedupResult {
   warnings: string[];
   /**
    * True when the table exceeded the scan guard and no partition was scoped, so
-   * Gozzle returned guidance instead of attempting a doomed full-table proof.
+   * gozzle returned guidance instead of attempting a doomed full-table proof.
    */
   scanSkipped?: boolean;
   /** Largest partitions to scope to, populated when `scanSkipped` is true. */

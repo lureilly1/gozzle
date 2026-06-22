@@ -1,26 +1,26 @@
 ---
 title: Privacy
-description: What Gozzle reads, what stays on your machine, and what it never does
+description: What gozzle reads, what stays on your machine, and what it never does
 ---
 
-Gozzle is a **local** tool. It runs on your machine as a CLI and an MCP stdio
-server. There are no Gozzle-operated servers, no accounts, and **no telemetry** —
-Gozzle never phones home, and we cannot see your schemas, queries, or data.
+gozzle is a **local** tool. It runs on your machine as a CLI and an MCP stdio
+server. There are no gozzle-operated servers, no accounts, and **no telemetry** —
+gozzle never phones home, and we cannot see your schemas, queries, or data.
 
-This page describes exactly what Gozzle touches. It is informational, not a legal
+This page describes exactly what gozzle touches. It is informational, not a legal
 contract.
 
-## What Gozzle connects to
+## What gozzle connects to
 
-Gozzle connects to **one thing**: the ClickHouse instance you configure through
+gozzle connects to **one thing**: the ClickHouse instance you configure through
 `GOZZLE_CLICKHOUSE_URL` and its credentials. Every statement runs with
-[`readonly = 2`](/docs/read-only), so Gozzle can read but can never write, alter,
+[`readonly = 2`](/docs/read-only), so gozzle can read but can never write, alter,
 or drop anything — enforced at the connection layer regardless of the account's
 privileges.
 
-## What Gozzle reads
+## What gozzle reads
 
-Gozzle reads only what a check needs:
+gozzle reads only what a check needs:
 
 - **Schema and layout metadata** from `system.tables`, `system.columns`, and
   `system.parts` — engines, keys, partitions, row/byte counts.
@@ -30,27 +30,27 @@ Gozzle reads only what a check needs:
   `EXPLAIN` output for [`diagnose_query`](/docs/diagnose-query).
 
 Checks return **verdicts and proof, not bulk data**. Result rows are
-[capped](/docs/guardrails) (`max_result_rows`, 10,000 by default), so Gozzle
+[capped](/docs/guardrails) (`max_result_rows`, 10,000 by default), so gozzle
 never pulls your tables down wholesale.
 
 ## What leaves your machine
 
-<Callout type="warn" title="Your AI client sees Gozzle's output">
-Gozzle returns its results to the AI client you connected it to (Claude Code,
+<Callout type="warn" title="Your AI client sees gozzle's output">
+gozzle returns its results to the AI client you connected it to (Claude Code,
 Cursor, Codex, …). That client may transmit those results to its model provider,
-exactly as it does for any other tool output. Gozzle controls what it returns —
+exactly as it does for any other tool output. gozzle controls what it returns —
 verdicts, counts, fingerprints, and small samples — but not what your AI client
 does with them. Treat sample keys and table names as data your AI provider will
 see.
 </Callout>
 
-Gozzle itself sends nothing anywhere except the read-only queries it runs against
+gozzle itself sends nothing anywhere except the read-only queries it runs against
 your configured ClickHouse.
 
-## What Gozzle stores locally
+## What gozzle stores locally
 
 - **Audit log** — [opt-in](/docs/audit-log), off by default. When
-  `GOZZLE_AUDIT_LOG` is set, Gozzle appends one JSON line per tool call to that
+  `GOZZLE_AUDIT_LOG` is set, gozzle appends one JSON line per tool call to that
   local file. Migration statements are recorded as a SHA-256
   fingerprint, never as raw SQL.
 - **Local slices** — only when you explicitly run
@@ -64,9 +64,9 @@ sensitive values. Protect the directory, set a retention period, and remove
 slices you no longer need with `gozzle slices clean`.
 </Callout>
 
-## What Gozzle never does
+## What gozzle never does
 
-The points above describe the **Gozzle tool** (the CLI and MCP server) running on
+The points above describe the **gozzle tool** (the CLI and MCP server) running on
 your machine:
 
 - No telemetry, analytics, crash reporting, or usage tracking.
@@ -77,7 +77,7 @@ your machine:
 ## This website
 
 This documentation site collects nothing — there is no signup form, no account,
-and no analytics or tracking. Gozzle is open source, so you can verify all of the
+and no analytics or tracking. gozzle is open source, so you can verify all of the
 above in the source.
 
 ## Questions

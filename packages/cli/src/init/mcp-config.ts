@@ -172,7 +172,7 @@ export function renderInit(
 ): string {
   const hosts = host ? [host] : HOST_IDS;
   const lines: string[] = [
-    "Configure Gozzle as an MCP server in your AI host.",
+    "Configure gozzle as an MCP server in your AI host.",
     ""
   ];
 
@@ -192,10 +192,10 @@ export function renderInit(
 
   lines.push("Before you connect:");
   lines.push(
-    "- Use a read-only ClickHouse user. Gozzle does not need write access and forces readonly=2 on every query."
+    "- Use a read-only ClickHouse user. gozzle does not need write access and forces readonly=2 on every query."
   );
   lines.push(
-    "- Replace the password placeholder. Gozzle reads it from the host config, not this output."
+    "- Replace the password placeholder. gozzle reads it from the host config, not this output."
   );
   lines.push(
     "- No table data leaves your machine unless you explicitly create a local slice."

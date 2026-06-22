@@ -45,7 +45,7 @@ export function createDiagnoseQueryTool(server: McpServer): void {
               content: [
                 {
                   type: "text",
-                  text: `Gozzle could not diagnose the query.\n\nQuery fingerprint: ${fingerprint(
+                  text: `gozzle could not diagnose the query.\n\nQuery fingerprint: ${fingerprint(
                     query
                   )}\n${formatDiagnosticError(error)}`
                 }

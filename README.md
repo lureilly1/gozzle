@@ -1,4 +1,4 @@
-# Gozzle
+# gozzle
 
 A safety harness for your ClickHouse, inside your own AI.
 

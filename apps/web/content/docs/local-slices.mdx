@@ -5,7 +5,7 @@ description: Reproduce one complete ClickHouse partition locally with bounded st
 
 `create_local_slice` copies one complete `ReplacingMergeTree`-family partition
 from ClickHouse into a persistent local [chDB](https://clickhouse.com/chdb)
-workspace. Gozzle replays normalized table DDL, imports the rows through Parquet,
+workspace. gozzle replays normalized table DDL, imports the rows through Parquet,
 and runs the same duplicate proof against the source partition and local copy.
 
 <Callout type="warn" title="Local slices contain production data">
@@ -19,7 +19,7 @@ retention period. Workspaces are not encrypted.
 
 Ask your AI client:
 
-> Use Gozzle to create a local slice of partition `202606` from
+> Use gozzle to create a local slice of partition `202606` from
 > `analytics.events`.
 
 Parameters:
@@ -32,11 +32,11 @@ The local engine is an optional native dependency supporting Linux and macOS on
 x86_64 and arm64. If chDB is unavailable, `create_local_slice` returns a clear
 error while the rest of the MCP server continues to work.
 
-## Why Gozzle requires a complete partition
+## Why gozzle requires a complete partition
 
 ClickHouse background merges and `FINAL` deduplicate within partition scope.
 Sampling or truncating a partition can remove duplicate evidence and produce a
-misleading local result. Gozzle therefore refuses partial slices.
+misleading local result. gozzle therefore refuses partial slices.
 
 The first version is intentionally narrow. A table must:
 
@@ -50,7 +50,7 @@ Use `inspect_table` to see whether `create_local_slice` is eligible. For a
 
 ## Proof comparison
 
-After replay, Gozzle compares duplicate groups, duplicate rows, and maximum
+After replay, gozzle compares duplicate groups, duplicate rows, and maximum
 copies between the source partition and local chDB database. Replay disables
 chDB's `optimize_on_insert` so insertion does not erase duplicate evidence.
 
@@ -61,7 +61,7 @@ Local duplicate rows: 2
 ```
 
 A proof mismatch usually means the source partition changed concurrently while
-Gozzle was exporting it. Remove that workspace and recreate the slice before
+gozzle was exporting it. Remove that workspace and recreate the slice before
 relying on it; the export and source proof are not a snapshot-atomic operation.
 
 ## Storage limits
@@ -76,7 +76,7 @@ workspaces together default to a 2 GiB limit:
 | `GOZZLE_MAX_SLICE_BYTES` | `268435456` | Maximum source bytes on disk for the complete partition. |
 | `GOZZLE_MAX_TOTAL_SLICE_BYTES` | `2147483648` | Maximum storage across valid, corrupt, and incomplete workspaces. |
 
-Before export, Gozzle projects Parquet plus chDB storage at approximately twice
+Before export, gozzle projects Parquet plus chDB storage at approximately twice
 the source partition's bytes on disk and refuses creation if it would exceed the
 aggregate limit. After replay it measures the real recursive workspace total.
 If the actual total exceeds the limit, the new workspace is removed and the

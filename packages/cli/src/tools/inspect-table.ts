@@ -12,7 +12,7 @@ export function createInspectTableTool(server: McpServer): void {
     {
       title: "Inspect ClickHouse Table",
       description:
-        "Inspect a ClickHouse table's physical layout and eligible Gozzle checks.",
+        "Inspect a ClickHouse table's physical layout and eligible gozzle checks.",
       inputSchema: {
         table: z
           .string()
@@ -46,7 +46,7 @@ export function createInspectTableTool(server: McpServer): void {
             content: [
               {
                 type: "text",
-                text: `Gozzle could not inspect the table.\n\n${formatErrorMessage(
+                text: `gozzle could not inspect the table.\n\n${formatErrorMessage(
                   error
                 )}`
               }

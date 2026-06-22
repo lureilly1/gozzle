@@ -46,7 +46,7 @@ export function createDryRunMigrationTool(server: McpServer): void {
               content: [
                 {
                   type: "text",
-                  text: `Gozzle could not dry-run the migration.\n\n${formatErrorMessage(
+                  text: `gozzle could not dry-run the migration.\n\n${formatErrorMessage(
                     error
                   )}`
                 }

@@ -4,14 +4,14 @@ description: Classify ClickHouse ALTER statements and estimate their physical re
 ---
 
 `dry_run_migration` accepts one `ALTER TABLE` statement, classifies its risk,
-and estimates affected rows, active parts, and compressed bytes. Gozzle never
+and estimates affected rows, active parts, and compressed bytes. gozzle never
 executes the proposed `ALTER` on production.
 
 ## Usage
 
 Ask your AI client:
 
-> Use Gozzle to dry-run `ALTER TABLE analytics.events DELETE WHERE tenant_id = 42`.
+> Use gozzle to dry-run `ALTER TABLE analytics.events DELETE WHERE tenant_id = 42`.
 
 The tool accepts one parameter:
 
@@ -28,18 +28,18 @@ rather than assigned a speculative safety verdict.
 | `metadata-only` | No existing data-part rewrite is expected, although the visible schema can change immediately. |
 | `part-rewriting` | Existing parts may be rewritten by a mutation, TTL operation, materialization, or column change. |
 | `risky-materialized-column` | Materialized-column behavior requires additional care even when the initial schema change is metadata-only. |
-| `unsupported` | Gozzle cannot make a defensible cost or safety claim for the statement. |
+| `unsupported` | gozzle cannot make a defensible cost or safety claim for the statement. |
 
 Examples of metadata-only operations include adding, dropping, renaming, and
 commenting on columns; adding or dropping indexes, projections, or constraints;
-and changing supported table metadata settings. Gozzle conservatively treats
+and changing supported table metadata settings. gozzle conservatively treats
 `MODIFY COLUMN`, TTL changes, materialization, and `CLEAR COLUMN` as potential
 part rewrites.
 
 ## Predicate mutation estimates
 
 For supported `ALTER ... UPDATE ... WHERE` and `ALTER ... DELETE ... WHERE`
-mutations, Gozzle executes a bounded, read-only production query using the same
+mutations, gozzle executes a bounded, read-only production query using the same
 predicate. It groups matching rows by ClickHouse's `_part` virtual column and
 joins those names to `system.parts`.
 
@@ -56,7 +56,7 @@ metadata as a conservative full-table upper bound.
 
 <Callout type="warn" title="Read-only does not mean unrestricted SQL">
 The estimate query runs against production, although the proposed ALTER never
-does. Gozzle rejects mutation subqueries and external-access functions such as
+does. gozzle rejects mutation subqueries and external-access functions such as
 `url()`, `s3()`, `remote()`, and `file()` so a dry run cannot turn its predicate
 into arbitrary nested or outbound production reads. Normal query guardrails,
 including execution-time and read limits, still apply.
@@ -114,7 +114,7 @@ mutations can change the eventual production cost after the dry run.
 ## Audit privacy
 
 Migration statements can contain sensitive literals. When audit logging is
-enabled, Gozzle records a SHA-256 fingerprint under `statementSha256` rather
+enabled, gozzle records a SHA-256 fingerprint under `statementSha256` rather
 than the raw statement. The formatted tool response still includes the
 statement supplied by the caller so the assessment remains reviewable.
 

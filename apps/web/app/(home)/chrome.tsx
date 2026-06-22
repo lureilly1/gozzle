@@ -1,8 +1,50 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
 import styles from './home.module.css';
 import { C, GITHUB_URL, GOOSE, INSTALL_COMMAND } from './theme';
+
+function CopyInstall() {
+  const [copied, setCopied] = useState(false);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(INSTALL_COMMAND);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // clipboard unavailable; ignore
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={copy}
+      title="Copy install command"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 9,
+        background: '#0e0e0e',
+        border: '1px solid rgba(242,193,78,.4)',
+        borderRadius: 7,
+        padding: '8px 12px',
+        cursor: 'pointer',
+        fontFamily: 'inherit',
+        fontSize: 12.5,
+        whiteSpace: 'nowrap',
+      }}
+    >
+      <span style={{ color: C.muted }}>$</span>
+      <code style={{ color: C.text }}>{INSTALL_COMMAND}</code>
+      <span style={{ color: C.amber, fontWeight: 700, minWidth: 56, textAlign: 'right' }}>
+        {copied ? 'copied!' : 'copy'}
+      </span>
+    </button>
+  );
+}
 
 export function SiteNav() {
   return (
@@ -43,9 +85,7 @@ export function SiteNav() {
         </a>
       </div>
 
-      <Link className={styles.cta} href="/docs/quickstart">
-        get started &gt;
-      </Link>
+      <CopyInstall />
     </div>
   );
 }
@@ -146,26 +186,3 @@ export function InstallBar() {
   );
 }
 
-export function SiteFooter() {
-  const sep = <span style={{ color: '#3a3a36' }}>·</span>;
-  return (
-    <div
-      className={styles.nav}
-      style={{
-        display: 'flex',
-        justifyContent: 'center',
-        gap: 18,
-        fontSize: 12,
-        marginTop: 22,
-      }}
-    >
-      <Link href="/docs">Docs</Link>
-      {sep}
-      <a href={GITHUB_URL} target="_blank" rel="noreferrer">
-        GitHub
-      </a>
-      {sep}
-      <Link href="/docs/privacy">Privacy</Link>
-    </div>
-  );
-}

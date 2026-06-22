@@ -8,7 +8,7 @@ import type { ClickHouseConnectionConfig } from "../../src/config/clickhouse.js"
 import { DEFAULT_GUARDRAILS } from "../../src/config/guardrails.js";
 
 // These tests prove protocol-level behavior chDB cannot exercise: that
-// readonly=2 actually blocks writes over HTTP, that Gozzle's guardrail
+// readonly=2 actually blocks writes over HTTP, that gozzle's guardrail
 // settings are accepted *alongside* readonly=2, and that a read limit aborts
 // an oversized scan. They require a real ClickHouse server. Start one with:
 //
@@ -36,8 +36,8 @@ const config: ClickHouseConnectionConfig = {
   database
 };
 
-// Admin client without Gozzle's read-only enforcement, used only to seed
-// fixtures. This is the privileged path Gozzle never uses at runtime.
+// Admin client without gozzle's read-only enforcement, used only to seed
+// fixtures. This is the privileged path gozzle never uses at runtime.
 let admin: ClickHouseClient;
 
 before(async () => {
@@ -73,7 +73,7 @@ test(
   async () => {
     const client = new ClickHouseHttpMetadataClient(config, DEFAULT_GUARDRAILS);
     try {
-      // The load-bearing assertion: Gozzle's guardrail settings are accepted
+      // The load-bearing assertion: gozzle's guardrail settings are accepted
       // by the server *and* the session is genuinely pinned to readonly=2.
       const rows = await client.queryJson<{ value: string }>(
         "SELECT value FROM system.settings WHERE name = 'readonly'"

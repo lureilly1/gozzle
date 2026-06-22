@@ -1,8 +1,8 @@
-# Gozzle
+# gozzle
 
 A safety harness for your ClickHouse, inside your own AI.
 
-Gozzle is a local developer toolkit for ClickHouse. The AI reasons; Gozzle runs checks and produces proof.
+gozzle is a local developer toolkit for ClickHouse. The AI reasons; gozzle runs checks and produces proof.
 
 ## Install
 
@@ -22,7 +22,7 @@ gozzle init claude     # just one host: claude, cursor, or codex
 `gozzle init` prints the config block and the file it belongs in for each host.
 URL, user, and database are filled from your environment when set; the password
 is always a placeholder so a secret is never printed. Use a read-only ClickHouse
-user — Gozzle forces `readonly=2` on every query and never needs write access.
+user — gozzle forces `readonly=2` on every query and never needs write access.
 
 ## Development
 
@@ -34,7 +34,7 @@ npm test
 
 ## ClickHouse Connection
 
-Gozzle reads ClickHouse connection details from environment variables:
+gozzle reads ClickHouse connection details from environment variables:
 
 ```bash
 GOZZLE_CLICKHOUSE_URL=http://localhost:8123
@@ -44,7 +44,7 @@ GOZZLE_CLICKHOUSE_DATABASE=default
 ```
 
 The `GOZZLE_` variables take precedence over the equivalent `CLICKHOUSE_` variables.
-Use a read-only ClickHouse user; Gozzle does not need write access.
+Use a read-only ClickHouse user; gozzle does not need write access.
 
 ## Faithful Local Slices
 
@@ -55,7 +55,7 @@ Use a read-only ClickHouse user; Gozzle does not need write access.
 
 `create_local_slice` copies one complete ReplacingMergeTree-family partition to
 a local chDB session through Parquet, replays a normalized local DDL, and reruns
-the duplicate proof against both source and local data. Gozzle refuses partial
+the duplicate proof against both source and local data. gozzle refuses partial
 partitions because ClickHouse merges and deduplicates within partition scope.
 
 If a table has multiple active partitions, pass the physical `partitionId`
@@ -70,12 +70,12 @@ GOZZLE_SLICE_DIR=$HOME/.gozzle/slices
 ```
 
 Each workspace contains `data.parquet`, a persistent chDB database, and a
-`manifest.json`. Source and local proofs must match before Gozzle reports the
+`manifest.json`. Source and local proofs must match before gozzle reports the
 slice as verified. A mismatch usually means the source partition changed during
 export; remove the workspace and recreate the slice. Replay disables chDB's
 `optimize_on_insert` so ReplacingMergeTree duplicates remain visible for proof.
 
-Gozzle measures the full recursive size of every slice workspace, including
+gozzle measures the full recursive size of every slice workspace, including
 Parquet and chDB files. Creation is refused when its projected storage would
 exceed `GOZZLE_MAX_TOTAL_SLICE_BYTES` (2 GiB by default), and the completed
 workspace is checked against the real aggregate before it is retained.
@@ -102,7 +102,7 @@ without executing it on production. It distinguishes metadata-only changes,
 part-rewriting mutations, risky materialized-column changes, and unsupported
 operations.
 
-For `ALTER ... UPDATE` and `ALTER ... DELETE`, Gozzle evaluates the predicate
+For `ALTER ... UPDATE` and `ALTER ... DELETE`, gozzle evaluates the predicate
 read-only and joins matching `_part` values to `system.parts`. The result shows
 both the matching row count and the complete compressed footprint of the parts
 that ClickHouse may rewrite. Full-table operations use current table metadata
@@ -120,7 +120,7 @@ behavior is validated independently.
 `diagnose_query` accepts one `SELECT` or `WITH ... SELECT` query and runs only
 `EXPLAIN indexes = 1, projections = 1`. It never executes the original query.
 
-Gozzle reports index conditions and selected/total parts and granules for each
+gozzle reports index conditions and selected/total parts and granules for each
 MergeTree read. Full scans, absent partition pruning, and absent primary-key
 granule pruning are marked as proven only when the EXPLAIN ratios support that
 claim. `FINAL`, function-wrapped predicates, leading-wildcard searches, broad

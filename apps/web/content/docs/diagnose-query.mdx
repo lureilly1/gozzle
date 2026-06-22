@@ -10,7 +10,7 @@ description: Prove ClickHouse pruning behavior with EXPLAIN and separate it from
 
 Ask your AI client:
 
-> Use Gozzle to diagnose this query: `SELECT count() FROM analytics.events WHERE tenant_id = 42`.
+> Use gozzle to diagnose this query: `SELECT count() FROM analytics.events WHERE tenant_id = 42`.
 
 The tool accepts one parameter:
 
@@ -18,13 +18,13 @@ The tool accepts one parameter:
 
 ## Proven evidence
 
-For every MergeTree read reported by EXPLAIN, Gozzle captures:
+For every MergeTree read reported by EXPLAIN, gozzle captures:
 
 - MinMax, partition, and primary-key conditions;
 - selected and total parts; and
 - selected and total granules.
 
-Gozzle reports a full scan only when EXPLAIN shows every reported part and
+gozzle reports a full scan only when EXPLAIN shows every reported part and
 granule selected. Missing partition pruning and missing primary-key pruning are
 also proven only when the corresponding condition is `true` and the selection
 ratio shows no reduction.

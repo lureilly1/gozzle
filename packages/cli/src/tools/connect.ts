@@ -43,7 +43,7 @@ export function createConnectTool(server: McpServer): void {
             content: [
               {
                 type: "text",
-                text: `Gozzle could not connect to ClickHouse.\n\n${formatErrorMessage(
+                text: `gozzle could not connect to ClickHouse.\n\n${formatErrorMessage(
                   error
                 )}`
               }
@@ -68,7 +68,7 @@ function formatConnectionInfo(info: ConnectionInfo): string {
     `User: ${info.currentUser}`,
     `Host: ${info.hostName}`,
     `Deployment: ${info.deployment}`,
-    `Read-only enforced by Gozzle: ${info.readonlyEnforced ? "yes (readonly=2)" : "no"}`,
+    `Read-only enforced by gozzle: ${info.readonlyEnforced ? "yes (readonly=2)" : "no"}`,
     `Effective readonly setting: ${info.effectiveReadonly ?? "unknown"}`
   ];
 

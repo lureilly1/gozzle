@@ -1,13 +1,13 @@
 ---
 title: Read-only enforcement
-description: Gozzle forces a read-only session so no statement can ever write
+description: gozzle forces a read-only session so no statement can ever write
 ---
 
-Gozzle is a safety harness, not a query client. To make that guarantee real
-rather than aspirational, every statement Gozzle issues runs with the ClickHouse
+gozzle is a safety harness, not a query client. To make that guarantee real
+rather than aspirational, every statement gozzle issues runs with the ClickHouse
 session setting **`readonly = 2`**. Under `readonly = 2` ClickHouse permits
 `SELECT`/`SHOW` and per-query settings, but rejects all writes and DDL — so even
-a future bug or a crafted input cannot mutate your data through Gozzle.
+a future bug or a crafted input cannot mutate your data through gozzle.
 
 This is enforced by construction at the connection layer, independently of the
 privileges the connected account happens to hold.
@@ -18,7 +18,7 @@ privileges the connected account happens to hold.
 the live connection:
 
 ```text
-Read-only enforced by Gozzle: yes (readonly=2)
+Read-only enforced by gozzle: yes (readonly=2)
 Effective readonly setting: 2
 ```
 
@@ -31,10 +31,10 @@ Account write-capable grants: INSERT, ALTER, TRUNCATE, OPTIMIZE, KILL QUERY
 ...
 Warnings:
 - Account has write-capable grants: INSERT, ALTER, TRUNCATE, OPTIMIZE, KILL QUERY.
-  Gozzle never writes, but a least-privilege read-only user is recommended.
+  gozzle never writes, but a least-privilege read-only user is recommended.
 ```
 
-Gozzle never needs write access. Pair read-only enforcement with a dedicated
+gozzle never needs write access. Pair read-only enforcement with a dedicated
 read-only ClickHouse user for defense in depth.
 
 ## Configuration
@@ -44,7 +44,7 @@ read-only ClickHouse user for defense in depth.
 | `GOZZLE_ENFORCE_READONLY` | `true` | Set to `false` to disable `readonly=2` enforcement. `connect` then warns that enforcement is off. |
 
 <Callout type="warn">
-Disabling read-only enforcement removes Gozzle's core safety guarantee. Only do
+Disabling read-only enforcement removes gozzle's core safety guarantee. Only do
 this if another mechanism (such as a strictly read-only account) protects the
 cluster.
 </Callout>

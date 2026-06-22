@@ -3,18 +3,18 @@
 import { useState } from 'react';
 import styles from '../(home)/home.module.css';
 import { C, GITHUB_URL, GOOSE, mono } from '../(home)/theme';
-import { SiteFooter, SiteNav, TitleBar } from '../(home)/chrome';
+import { SiteNav, TitleBar } from '../(home)/chrome';
 
 const FAQS: Array<{ q: string; tag: string; a: string }> = [
   {
-    q: 'What is Gozzle?',
+    q: 'What is gozzle?',
     tag: '// basics',
     a: 'An MCP server that gives your AI agent a faithful, read-only local slice of your ClickHouse — so it can run, test, and prove migrations and queries before anything touches production.',
   },
   {
     q: 'Does my data ever leave my machine?',
     tag: '// privacy',
-    a: 'No. Gozzle runs the local slice with chDB on your own machine. Your data, queries, and schemas stay local — nothing is uploaded or sent to us.',
+    a: 'No. gozzle runs the local slice with chDB on your own machine. Your data, queries, and schemas stay local — nothing is uploaded or sent to us.',
   },
   {
     q: 'Which tools does it work with?',
@@ -29,7 +29,7 @@ const FAQS: Array<{ q: string; tag: string; a: string }> = [
   {
     q: 'Is it free?',
     tag: '// license',
-    a: 'Yes — Gozzle is free and open source under the MIT license. Install it from npm, read the source on GitHub, and contributions are welcome.',
+    a: 'Yes — gozzle is free and open source under the MIT license. Install it from npm, read the source on GitHub, and contributions are welcome.',
   },
   {
     q: 'How do I get started?',
@@ -227,8 +227,6 @@ export default function FaqPage() {
             </pre>
           </div>
         </div>
-
-        <SiteFooter />
       </div>
     </div>
   );

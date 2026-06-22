@@ -78,7 +78,7 @@ export function parseMigrationStatement(input: string): ParsedMigration {
       "all",
       materialized
         ? "Changing a MATERIALIZED column expression can require existing data to be rebuilt."
-        : "MODIFY COLUMN can rewrite existing column data; Gozzle uses the full table as an upper bound.",
+        : "MODIFY COLUMN can rewrite existing column data; gozzle uses the full table as an upper bound.",
       "Validate type conversion and defaults on a local slice before running this ALTER."
     );
   }
@@ -140,7 +140,7 @@ export function parseMigrationStatement(input: string): ParsedMigration {
     statement,
     table,
     operation,
-    "Gozzle does not yet have a defensible cost model for this ALTER operation."
+    "gozzle does not yet have a defensible cost model for this ALTER operation."
   );
 }
 

@@ -3,7 +3,7 @@ export interface GuardrailConfig {
   enforceReadonly: boolean;
   /** Hard wall-clock cap per query, in seconds. 0 disables. */
   maxExecutionTimeSeconds: number;
-  /** Cap rows returned to Gozzle. 0 disables. Gozzle only needs verdicts. */
+  /** Cap rows returned to gozzle. 0 disables. gozzle only needs verdicts. */
   maxResultRows: number;
   /** Cap rows a query may read before it is aborted. 0 disables. */
   maxRowsToRead: number;
@@ -56,7 +56,7 @@ export function readGuardrailConfig(
 
 /**
  * Translate the guardrail config into ClickHouse session settings applied to
- * every query Gozzle runs.
+ * every query gozzle runs.
  */
 export function toClickHouseSettings(
   guardrails: GuardrailConfig

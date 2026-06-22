@@ -1,6 +1,6 @@
-# Gozzle Implementation Plan
+# gozzle Implementation Plan
 
-Gozzle is a local safety harness and developer toolkit for ClickHouse. The initial product should stay narrow: help developers inspect risky ClickHouse behavior, verify common correctness problems, and de-risk migrations before production.
+gozzle is a local safety harness and developer toolkit for ClickHouse. The initial product should stay narrow: help developers inspect risky ClickHouse behavior, verify common correctness problems, and de-risk migrations before production.
 
 The guiding product line is:
 
@@ -8,11 +8,11 @@ The guiding product line is:
 
 The practical implementation stance is:
 
-> Gozzle is a ClickHouse developer toolkit that AI agents can use well. The AI reasons; Gozzle runs checks and produces proof.
+> gozzle is a ClickHouse developer toolkit that AI agents can use well. The AI reasons; gozzle runs checks and produces proof.
 
 The product boundary versus the official ClickHouse MCP is deliberate:
 
-> The official ClickHouse MCP is a query gateway. Gozzle is a safety harness: it runs bounded checks and returns verdicts with proof.
+> The official ClickHouse MCP is a query gateway. gozzle is a safety harness: it runs bounded checks and returns verdicts with proof.
 
 ## Current Progress
 
@@ -149,7 +149,7 @@ Deliverables:
 
 Success criteria:
 
-- Given a table name, Gozzle can explain the physical layout.
+- Given a table name, gozzle can explain the physical layout.
 - It can identify whether the table is a `ReplacingMergeTree`.
 - It can tell whether the table is eligible for `verify_dedup`.
 
@@ -210,7 +210,7 @@ Deliverables:
 - `create_local_slice` MCP tool.
 - Hard row and byte budgets controlled by `GOZZLE_MAX_SLICE_ROWS` and
   `GOZZLE_MAX_SLICE_BYTES`.
-- Complete-partition requirement: Gozzle refuses partial data because merges
+- Complete-partition requirement: gozzle refuses partial data because merges
   and `FINAL` deduplicate within partition scope.
 - chDB replay with `optimize_on_insert=0` so import does not erase duplicate
   evidence before verification.
@@ -320,7 +320,7 @@ Success criteria:
 - Separates verified findings from advisory findings.
 - Avoids pretending to prove performance deltas before the fidelity spike.
 - Embedded chDB tests prove full-scan and primary-key-pruning classification
-  against the ClickHouse EXPLAIN output shipped with Gozzle.
+  against the ClickHouse EXPLAIN output shipped with gozzle.
 
 ## Phase 8: Test Harness and Fixtures
 
@@ -346,7 +346,7 @@ Success criteria:
 
 ## Phase 9: Beta Packaging
 
-Goal: make Gozzle installable by early users.
+Goal: make gozzle installable by early users.
 
 Deliverables:
 

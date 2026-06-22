@@ -1,91 +1,139 @@
-# Gozzle Product Direction
+# gozzle Product Direction
 
-Captured while questioning whether what's built is a payable product and lives up
-to "The ClickHouse brain in your AI agent." This is a strategy note, not a spec.
+Supersedes the earlier "workload-aggregation brain" framing. The wedge is not a
+cluster scanner or a hosted brain — it is a **read-only test harness for
+ClickHouse changes** that proves whether a query or migration is safe against the
+real cluster, every time a developer touches ClickHouse SQL.
 
-## The honest verdict
+## The reframe
 
-What's built today is an excellent **tool**, not yet a **product**. The
-verification core is strong and hard to replicate — most people get dedup/FINAL
-scope, mutation cost, and EXPLAIN-proven pruning wrong; Gozzle gets them right,
-with a safety posture that holds up. That is a real moat and the right
-foundation.
+> Stop: "point gozzle at a cluster and find issues."
+> Start: "every time a developer changes ClickHouse SQL, gozzle proves whether
+> the change is safe against the real cluster."
 
-But as it stands Gozzle is **reactive, stateless, and narrow in stance**:
+"Scan my cluster" is an **event**. "Verify this change" is a **habit**. Developers
+don't decide to audit a database; they change a query, open a PR, add a migration,
+or accept agent-generated SQL. gozzle must attach to that change surface.
 
-- **Reactive** — it only answers when an agent invokes a specific tool on a
-  specific table/query. It never surfaces a problem you didn't know to ask about.
-- **Stateless** — every call is cold. No model of *your* cluster, no memory of
-  prior findings, no sense of what changed.
-- **A verifier, not an advisor** — it proves facts; it doesn't carry judgment.
+Core primitive:
 
-That combination is a **one-time audit**, which is the trap the implementation
-plan already names ("recurring toolkit or one-time audit?"). People run a check,
-fix the issue, and leave — hard to charge a subscription for.
+```bash
+gozzle verify ./queries/revenue.sql
+gozzle verify --changed          # prove the ClickHouse impact of this branch
+```
 
-"The ClickHouse **brain**" also oversells today's reality: the brain is Claude;
-Gozzle is the **senses and the lab** (precise instruments that give the agent
-ground truth). The gap to "brain" is not *smartness* — the checks are smart — it
-is **stance**: reactive → proactive, stateless → context, verifier → advisor.
+Identity:
+- Primary: **the read-only test harness for ClickHouse changes.**
+- AI sub-positioning: **the proof layer for ClickHouse agents** — the official
+  ClickHouse skill gives advice; gozzle proves whether the advice survives contact
+  with the user's real schema and data.
 
-## The three additions (priority order)
+## Two ideas that make it work
 
-These are additive to the verification core, not a rebuild.
+**1. Repo context, not cluster memory.** gozzle needs *project configuration*, not
+a stateful hosted brain. A `gozzle.yaml` declares where SQL lives, the read-only
+connection profile, and — critically — **assumptions** (uniqueness, append-only,
+engine). This is local and versioned, like `tsconfig`/`dbt_project.yml`.
 
-### 1. Workload awareness — aggregate and flag (the product-maker)
+```yaml
+connection: clickhouse-prod-readonly
+queries: [app/**/*.sql, dashboards/**/*.sql, dbt/models/**/*.sql]
+migrations: [migrations/**/*.sql]
+assumptions:
+  events: { unique_by: [event_id], engine: ReplacingMergeTree }
+  raw_events: { append_only: true }
+```
 
-Today Gozzle diagnoses *one* query when asked. The product version ingests
-`system.query_log`, normalizes by query pattern, ranks by cost/frequency, and
-**proactively flags the worst offenders**: "these 5 query shapes are 80% of your
-scan bytes — here's why each is bad and the fix."
+**2. Read-path proof, not "duplicates exist."** Sophisticated users expect
+duplicates in ReplacingMergeTree *storage*; the bug is a read path that trusts
+uniqueness the data violates. The wow output is:
+`revenue_by_customer.sql` reads `events` as if `event_id` is unique, but the table
+currently has N unresolved duplicate keys → this query can overcount.
 
-This single shift delivers what a paid product needs:
+The declared `assumptions` block is what makes this **tractable**: instead of
+inferring uniqueness intent from arbitrary SQL (a research problem), gozzle checks
+(a) does current data violate the declared key (`verify_dedup`), and (b) does the
+query read that table without FINAL/dedup. Lead with the qualitative violation;
+treat an exact "overcounts by X%" as a later stretch (needs bounded execution).
 
-- **Recurring** — the workload changes weekly, so there's a reason to return.
-- **Proactive** — finds problems the user didn't know to ask about (the "wow").
-- **Aggregated value** — a ranked list of real problems beats a single verdict.
+## Commercial guardrail (the line we will not cross for free)
 
-Defensible because it's Gozzle's ClickHouse expertise applied at fleet scale.
-**This is the next thing to build**, because it is the hypothesis that decides
-whether a recurring product exists at all.
+**Local / one-shot / non-persisted = free, build now. Hosted / persisted / team /
+shared = paid, hold off.** We do not build the paid moat for free. Anything that
+could be the team/CI product is parked until the paid layer.
 
-### 2. Persistent context / memory of the cluster (earns the word "brain")
+The habit-forming surfaces are the ones that fire automatically — a CI exit code
+and the agent auto-trigger — *not* the manual command (most branches don't touch
+ClickHouse, so `verify --changed` is often empty). We ship the free primitives
+that enable both, but **not** the productized team CI integration.
 
-A retained model of *this* ClickHouse — its tables, which are
-correctness-sensitive, prior findings, what changed. Every agent interaction then
-gets that context for free, and value **compounds** with use. This is the
-difference between a calculator and a brain, and it is what makes switching away
-painful.
+## Build now — free / local only
 
-### 3. Baked-in skills + compose with the agent's skills
+1. **Release a real `latest`.** Not just a dist-tag flip: commit + publish the
+   current working tree (includes the P0 large-table dedup safety guard), then
+   point `latest` at it. The default install must be safe on big tables.
+2. **`gozzle.yaml`** — config loader: connection profile, query/migration globs,
+   `assumptions` (unique_by / append_only / engine). Local, versioned.
+3. **`verify --query <file>` / `verify --changed` / `--diff`** — run the existing
+   verifier engine over changed SQL/migrations; exit non-zero on findings so users
+   can wire it into *their own* CI. (We provide the primitive, not a hosted Action.)
+4. **Read-path / assumption-violation proof** — declared-intent version: for each
+   query on a declared-unique table, prove data violates the key + the query lacks
+   FINAL. Qualitative first; exact percentages deferred.
+5. **Local discovery** — repo globs first (`.sql`, migrations, dbt/sqlmesh); then a
+   one-shot, **non-persisted** `system.query_log` import (discovery, not
+   monitoring).
+6. **Agent trigger skill** — local: when ClickHouse SQL/migrations are written,
+   modified, or reviewed and a `gozzle.yaml` exists, the agent runs gozzle to
+   verify before presenting a final answer.
+7. **`scan_cluster` / `inspect_table`** — keep as onboarding / first-run wow /
+   design-partner measurement, not the daily habit.
 
-- **Baked-in**: encode ClickHouse judgment, not just checks — ORDER BY/partition
-  design, projection/MV advice, schema review. Verifier → advisor.
-- **Compose, don't replace**: keep the no-auto-fix stance, but return
-  **structured outputs** so the agent's *own* skills act on findings (write the
-  corrected query, draft the migration). Gozzle stays the source of truth; the
-  agent stays the actor. This makes Gozzle a force-multiplier for Claude, not a
-  competitor.
+## Hold — paid (hosted / persisted / team)
 
-## What not to lose
+Do **not** build these now; they are the paid layer:
+- Hosted CI / GitHub-GitLab App that posts PR comments.
+- Shared or persisted proof-artifact history (server-side storage).
+- Team policy config, required-checks management, per-seat licensing.
+- Any retained cluster/workload state or monitoring over time (the rejected
+  "brain").
 
-The verification core and the safety/trust posture ("verdict + proof",
-read-only, nothing leaves the machine). That is the wedge and the moat. Do not
-dilute it into a generic AI database assistant.
+## Later (bigger local features, after retention is proven)
 
-## How this resolves open-core / monetization
+- Materialized-view correctness — a real build; next bet once branch-verification
+  shows retention.
+- Inferring uniqueness assumptions from SQL (vs. declared) and exact overcount %.
 
-- **Free (the wedge):** on-demand verification — the checks already built. Open,
-  local, trust-building.
-- **Paid (the brain):** the persistent, proactive layer — workload monitoring,
-  cluster memory, flagging over time. Naturally recurring and naturally tied to
-  something Gozzle operates, which justifies a subscription and a license check.
+## Commercial split
 
-Free attracts; the brain is what they pay for.
+- **Free / local:** CLI, MCP server, `gozzle.yaml`, `verify --query/--changed`,
+  local + one-shot discovery, local proof output, non-zero CI exit code, agent
+  skill, `scan_cluster`.
+- **Paid / hosted:** GitHub/GitLab app + PR comments, shared/persisted proof
+  history, team policy + required checks, license/seat management.
 
-## The next bet and how to measure it
+Teams already pay for CI guardrails (typecheck, security scan, lint). "Correctness
+gate for ClickHouse changes" fits that budget — but only the *hosted/team* form is
+paid; the local primitive is free and open source.
 
-Ship **#1 (query_log aggregation)** to the first design partners and watch one
-signal: **do they come back next week without being prompted?** That answer is
-worth more than any further analysis. If yes, there is a recurring product. If
-no, it is an audit tool and the strategy must change.
+## What this changes about what's built
+
+- **Keeper (the asset):** the verifier engine — `dedup.ts`, `migration.ts`,
+  `query-diagnosis.ts`, introspection, the read-only client. `verify --changed`,
+  the agent, and (later) CI all reuse it. Nothing is wasted.
+- **New free workflow layer to build:** `gozzle.yaml` loader → discovery /
+  `--changed` / `--diff` → assumption-violation proof → agent trigger skill.
+- **Demoted to supporting/onboarding:** `inspect_table` + `scan_cluster`;
+  `create_local_slice` (reproduce a finding offline, not a headline).
+- **Website:** reframed from "safety harness / brain" to "test harness for
+  ClickHouse changes." (Hero copy already updated.)
+
+## Validation metric
+
+Not "number of clusters with duplicates." The metric is the **non-empty
+meaningful finding rate** — users who say *"I didn't know this, and I need to fix
+it,"* tied to a named query, dashboard, or migration they care about. Have 5–10
+ClickHouse users run init → discover → verify --changed → scan, and measure: did
+it surprise them, was it tied to something they care about, would they put it in
+CI, did they trust the read-only/local posture, did they understand the output
+without ClickHouse expertise.
