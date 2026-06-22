@@ -1,0 +1,59 @@
+name: Release
+
+# Publishes @gozzle/cli to npm under the `latest` tag when a version tag is
+# pushed (e.g. v0.1.0). The version is taken from the tag, so the tag is the
+# source of truth. Reuses the same npm token as the canary workflow.
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish (e.g. 0.1.0)"
+        required: true
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: https://registry.npmjs.org
+          scope: "@gozzle"
+
+      - name: Resolve version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "value=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Set version
+        run: npm version "${{ steps.version.outputs.value }}" --no-git-tag-version -w @gozzle/cli
+
+      - name: Build
+        run: npm run build -w @gozzle/cli
+
+      - name: Test
+        run: npm test -w @gozzle/cli
+
+      - name: Publish latest
+        run: npm publish -w @gozzle/cli --tag latest --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.SECRET_KEY }}

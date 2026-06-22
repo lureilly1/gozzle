@@ -1,6 +1,6 @@
 {
   "name": "@gozzle/cli",
-  "version": "0.0.1-canary.0",
+  "version": "0.1.0",
   "description": "A local safety harness and developer toolkit for ClickHouse.",
   "type": "module",
   "private": false,
@@ -15,7 +15,7 @@
   ],
   "publishConfig": {
     "access": "public",
-    "tag": "canary"
+    "tag": "latest"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
