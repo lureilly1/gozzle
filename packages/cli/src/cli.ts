@@ -4,6 +4,7 @@ import { readPackageMetadata } from "./shared/package-metadata.js";
 import { readLocalSliceConfig } from "./config/local-slice.js";
 import { cleanLocalSlices, listLocalSlices } from "./local-engine/slice-store.js";
 import { isHostId, renderInit } from "./init/mcp-config.js";
+import { renderSkill } from "./init/agent-skill.js";
 import { runVerifyCommand } from "./commands/verify.js";
 
 const metadata = readPackageMetadata();
@@ -23,6 +24,15 @@ if (command === "init") {
   process.exit(0);
 }
 
+if (command === "skill") {
+  const host = process.argv[3];
+  if (host !== undefined && !isHostId(host)) {
+    fail("Usage: gozzle skill [claude|cursor|codex]");
+  }
+  console.log(renderSkill(host));
+  process.exit(0);
+}
+
 if (command === "verify") {
   const code = await runVerifyCommand(process.argv.slice(3));
   process.exit(code);
@@ -38,6 +48,7 @@ console.log("");
 console.log("Commands:");
 console.log("  gozzle verify        Verify SQL files | --changed | --diff <range> | --all (exit 1 on findings)");
 console.log("  gozzle init [host] Print MCP config (host: claude, cursor, codex)");
+console.log("  gozzle skill [host] Print the agent instruction to auto-verify ClickHouse changes");
 console.log("  gozzle slices      List and clean local slice workspaces");
 console.log("  gozzle version     Print the CLI version");
 console.log("  gozzle-mcp         Start the MCP stdio server");
