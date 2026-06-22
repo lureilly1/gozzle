@@ -5,8 +5,10 @@ import { join } from "node:path";
 import test from "node:test";
 
 import type { ClickHouseMetadataClient } from "../src/clickhouse/client.js";
+import { mkdir } from "node:fs/promises";
 import {
   aggregateExitCode,
+  discoverConfiguredFiles,
   parseVerifyArgs,
   runVerifyCommand,
   selectVerifiableFiles,
@@ -90,7 +92,7 @@ const OPTS = { strict: false, json: false };
 test("parseVerifyArgs collects files and flags, rejects unknown flags", () => {
   assert.deepEqual(parseVerifyArgs(["a.sql", "--strict", "b.sql"]), {
     files: ["a.sql", "b.sql"],
-    options: { strict: true, json: false, changed: false }
+    options: { strict: true, json: false, changed: false, all: false }
   });
   assert.equal(parseVerifyArgs(["--bogus"]).error, "Unknown flag: --bogus");
 });
@@ -106,6 +108,37 @@ test("parseVerifyArgs handles --changed and --diff <range>", () => {
     parseVerifyArgs(["--diff", "--strict"]).error ?? "",
     /--diff requires a git range/
   );
+});
+
+test("parseVerifyArgs handles --all", () => {
+  assert.equal(parseVerifyArgs(["--all"]).options.all, true);
+  assert.equal(parseVerifyArgs([]).options.all, false);
+});
+
+test("discoverConfiguredFiles walks the tree and matches config globs", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "gozzle-discover-"));
+  try {
+    await mkdir(join(dir, "app", "models"), { recursive: true });
+    await mkdir(join(dir, "migrations"), { recursive: true });
+    await mkdir(join(dir, "node_modules", "pkg"), { recursive: true });
+    await writeFile(join(dir, "app", "models", "revenue.sql"), "SELECT 1", "utf8");
+    await writeFile(join(dir, "migrations", "001.sql"), "ALTER TABLE t ADD COLUMN x UInt8", "utf8");
+    await writeFile(join(dir, "README.md"), "# hi", "utf8");
+    await writeFile(join(dir, "node_modules", "pkg", "ignored.sql"), "SELECT 1", "utf8");
+
+    const config: GozzleProjectConfig = {
+      queries: ["app/**/*.sql"],
+      migrations: ["migrations/**/*.sql"],
+      assumptions: {}
+    };
+    const found = (await discoverConfiguredFiles(dir, config)).sort();
+    assert.deepEqual(found, [
+      join(dir, "app", "models", "revenue.sql"),
+      join(dir, "migrations", "001.sql")
+    ]);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });
 
 test("selectVerifiableFiles filters by config globs, else by .sql", () => {

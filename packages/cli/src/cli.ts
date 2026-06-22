@@ -36,7 +36,7 @@ if (command === "slices") {
 console.log(`gozzle ${metadata.version}`);
 console.log("");
 console.log("Commands:");
-console.log("  gozzle verify        Verify SQL files | --changed | --diff <range> (exit 1 on findings)");
+console.log("  gozzle verify        Verify SQL files | --changed | --diff <range> | --all (exit 1 on findings)");
 console.log("  gozzle init [host] Print MCP config (host: claude, cursor, codex)");
 console.log("  gozzle slices      List and clean local slice workspaces");
 console.log("  gozzle version     Print the CLI version");

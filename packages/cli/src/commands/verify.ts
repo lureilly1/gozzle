@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { readdir, readFile } from "node:fs/promises";
+import { dirname, join, relative, sep } from "node:path";
 import { promisify } from "node:util";
 
 import type { ClickHouseMetadataClient } from "../clickhouse/client.js";
@@ -41,6 +41,7 @@ export interface VerifyOptions {
   strict: boolean;
   json: boolean;
   changed: boolean;
+  all: boolean;
   diff?: string;
 }
 
@@ -64,13 +65,19 @@ export interface ParsedVerifyArgs {
 
 export function parseVerifyArgs(argv: string[]): ParsedVerifyArgs {
   const files: string[] = [];
-  const options: VerifyOptions = { strict: false, json: false, changed: false };
+  const options: VerifyOptions = {
+    strict: false,
+    json: false,
+    changed: false,
+    all: false
+  };
 
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === "--strict") options.strict = true;
     else if (arg === "--json") options.json = true;
     else if (arg === "--changed") options.changed = true;
+    else if (arg === "--all") options.all = true;
     else if (arg === "--diff") {
       const range = argv[i + 1];
       if (!range || range.startsWith("--")) {
@@ -269,16 +276,29 @@ export async function runVerifyCommand(
     return 2;
   }
 
-  let project: GozzleProjectConfig | undefined;
+  let loaded;
   try {
-    project = (await readProjectConfig())?.config;
+    loaded = await readProjectConfig();
   } catch (configError) {
     console.error(message(configError));
     return 2;
   }
+  const project = loaded?.config;
 
   let targetFiles = argFiles;
-  if (options.changed || options.diff) {
+  if (options.all) {
+    if (!loaded || project!.queries.length + project!.migrations.length === 0) {
+      console.error(
+        "gozzle verify --all needs a gozzle.yaml with queries and/or migrations globs."
+      );
+      return 2;
+    }
+    targetFiles = await discoverConfiguredFiles(dirname(loaded.path), project!);
+    if (targetFiles.length === 0) {
+      console.log("No ClickHouse files matched the configured globs.");
+      return 0;
+    }
+  } else if (options.changed || options.diff) {
     try {
       targetFiles = await resolveGitFiles(options, project);
     } catch (gitError) {
@@ -293,7 +313,7 @@ export async function runVerifyCommand(
     }
   } else if (argFiles.length === 0) {
     console.error(
-      "Usage: gozzle verify <file ...> | --changed | --diff <range> [--strict] [--json]"
+      "Usage: gozzle verify <file ...> | --changed | --diff <range> | --all [--strict] [--json]"
     );
     return 2;
   }
@@ -352,6 +372,39 @@ async function gitLines(args: string[]): Promise<string[]> {
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean);
+}
+
+const IGNORED_DIRS = new Set([
+  "node_modules",
+  ".git",
+  "dist",
+  ".next",
+  ".gozzle"
+]);
+
+/** Walk `root`, returning forward-slash paths relative to it (skipping junk). */
+export async function walkFiles(root: string, dir: string = root): Promise<string[]> {
+  const entries = await readdir(dir, { withFileTypes: true });
+  const files: string[] = [];
+  for (const entry of entries) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (IGNORED_DIRS.has(entry.name)) continue;
+      files.push(...(await walkFiles(root, full)));
+    } else if (entry.isFile()) {
+      files.push(relative(root, full).split(sep).join("/"));
+    }
+  }
+  return files;
+}
+
+/** Discover every configured query/migration file under `root` as absolute paths. */
+export async function discoverConfiguredFiles(
+  root: string,
+  config: GozzleProjectConfig
+): Promise<string[]> {
+  const all = await walkFiles(root);
+  return selectVerifiableFiles(all, config).map((rel) => join(root, rel));
 }
 
 /**
