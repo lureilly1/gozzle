@@ -101,6 +101,21 @@ Risk: dashboards querying without FINAL may overcount
 That is the proof moment: a claim a plain `SELECT count()` can't make, backed by
 ClickHouse's own semantics.
 
+## Verify changes in your workflow
+
+The fastest path into daily use is [`gozzle verify`](/docs/verify): point it at
+changed SQL and it proves whether the change is safe, exiting non-zero on
+findings.
+
+```bash
+gozzle verify ./queries/revenue.sql   # one file
+gozzle verify --changed               # everything changed on this branch
+```
+
+Add a [`gozzle.yaml`](/docs/verify#gozzleyaml) with your tables' uniqueness
+assumptions to unlock the read-path proof, and run `gozzle skill` so your agent
+verifies changes automatically.
+
 ## Where to go next
 
 - [`dry_run_migration`](/docs/dry-run-migration) — classify an `ALTER` and

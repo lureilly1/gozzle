@@ -4,6 +4,7 @@
     "---Getting started---",
     "index",
     "quickstart",
+    "verify",
     "---Checks---",
     "verify-dedup",
     "local-slices",

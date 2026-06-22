@@ -1,0 +1,101 @@
+---
+title: Verify changes
+description: Prove a ClickHouse query or migration is safe against the real cluster, from the CLI or your agent
+---
+
+`gozzle verify` is a read-only test harness for ClickHouse changes. Point it at a
+SQL file (or your branch's changes) and it routes a `SELECT` to query diagnosis
+and an `ALTER` to a migration dry-run against the real cluster, then **exits
+non-zero on findings** so it drops into any pre-commit hook or CI step.
+
+It uses the same read-only connection as the rest of gozzle
+([read-only enforcement](/docs/read-only)): set `GOZZLE_CLICKHOUSE_URL` and
+credentials in the environment.
+
+## The verb
+
+```bash
+gozzle verify ./queries/revenue.sql        # one file
+gozzle verify --changed                     # files changed on this branch
+gozzle verify --diff origin/main...HEAD     # files in a git range (use in CI)
+gozzle verify --all                         # the whole configured SQL surface
+gozzle verify ./q.sql --strict              # also fail on advisory findings
+gozzle verify ./q.sql --json                # machine-readable output
+```
+
+- A file containing a `SELECT`/`WITH … SELECT` is diagnosed with
+  [`diagnose_query`](/docs/diagnose-query); an `ALTER TABLE` is assessed with
+  [`dry_run_migration`](/docs/dry-run-migration). The original query/migration is
+  never executed.
+- `--changed` resolves uncommitted and untracked changes; `--diff <range>` uses a
+  git range; `--all` walks the [`gozzle.yaml`](#gozzleyaml) globs.
+
+### Exit codes
+
+| Code | Meaning |
+| --- | --- |
+| `0` | Clean — no failing findings (advisories alone pass without `--strict`). |
+| `1` | Findings that fail the gate: a **proven** query problem, or a migration that rewrites parts. |
+| `2` | Operational error — bad file, unknown statement, or no connection. |
+
+Because the gate is just an exit code, you can wire it into your own CI:
+
+```bash
+gozzle verify --diff origin/main...HEAD
+```
+
+## gozzle.yaml
+
+A small, versioned project file tells gozzle where your SQL lives and what your
+tables are expected to be — local config, not a hosted service. gozzle walks up
+from the working directory to find it.
+
+```yaml
+# gozzle.yaml
+database: default
+queries:
+  - app/**/*.sql
+  - dashboards/**/*.sql
+migrations:
+  - migrations/**/*.sql
+assumptions:
+  events:
+    unique_by: [event_id]
+    engine: ReplacingMergeTree
+  raw_events:
+    append_only: true
+```
+
+`queries`/`migrations` globs drive `--all` (and filter `--changed`).
+`assumptions` power the read-path proof below.
+
+## The read-path proof
+
+Duplicates inside a `ReplacingMergeTree` are expected storage behaviour — the
+bug is a query that reads such a table **as if rows were already unique**. When a
+query reads a table you've declared `unique_by` *without* `FINAL`, gozzle checks
+whether the current data actually violates that assumption:
+
+```text
+Read-path proof:
+- [violated] analytics.events is read without FINAL and trusted as unique by
+  (event_id), but currently has 2,400,000 duplicate row(s) by sorting key —
+  this query can overcount.
+```
+
+A violation fails the gate. Large tables that can't be confirmed within the scan
+guard are reported as `[unknown]` rather than blocking.
+
+## Make your agent verify automatically
+
+`gozzle skill` prints an instruction you add to your AI agent so it verifies
+ClickHouse changes with gozzle before answering — the official ClickHouse skill
+gives advice; gozzle proves it against your data.
+
+```bash
+gozzle skill            # instruction + where it goes, for every host
+gozzle skill cursor     # one host: claude, cursor, or codex
+```
+
+It places into CLAUDE.md (Claude Code), `.cursor/rules/gozzle.mdc` (Cursor), or
+AGENTS.md (Codex), and tells the agent to treat gozzle's verdict as ground truth.
