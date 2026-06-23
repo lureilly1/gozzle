@@ -20,7 +20,9 @@ import { DEFAULT_GUARDRAILS } from "../../src/config/guardrails.js";
 const url =
   process.env.GOZZLE_CLICKHOUSE_URL ?? process.env.CLICKHOUSE_URL ?? "";
 const username =
-  process.env.GOZZLE_CLICKHOUSE_USER ?? process.env.CLICKHOUSE_USER ?? "default";
+  process.env.GOZZLE_CLICKHOUSE_USER ??
+  process.env.CLICKHOUSE_USER ??
+  "default";
 const password =
   process.env.GOZZLE_CLICKHOUSE_PASSWORD ??
   process.env.CLICKHOUSE_PASSWORD ??

@@ -29,7 +29,8 @@ export function createConnectTool(server: McpServer): void {
               content: [{ type: "text", text: formatConnectionInfo(info) }]
             };
           },
-          (error) => `gozzle could not connect to ClickHouse.\n\n${errorMessage(error)}`
+          (error) =>
+            `gozzle could not connect to ClickHouse.\n\n${errorMessage(error)}`
         )
       )
   );
@@ -52,7 +53,9 @@ function formatConnectionInfo(info: ConnectionInfo): string {
   ];
 
   if (info.writePrivileges.length > 0) {
-    lines.push(`Account write-capable grants: ${info.writePrivileges.join(", ")}`);
+    lines.push(
+      `Account write-capable grants: ${info.writePrivileges.join(", ")}`
+    );
   }
 
   if (info.warnings.length > 0) {
@@ -62,5 +65,3 @@ function formatConnectionInfo(info: ConnectionInfo): string {
 
   return lines.join("\n");
 }
-
-

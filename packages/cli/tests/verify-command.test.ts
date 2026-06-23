@@ -52,7 +52,10 @@ const PRUNED_EXPLAIN = explain([
 
 const MIGRATION_RESPONSES = {
   "SHOW CREATE TABLE": [
-    { statement: "CREATE TABLE default.t (id UInt64) ENGINE = MergeTree ORDER BY id" }
+    {
+      statement:
+        "CREATE TABLE default.t (id UInt64) ENGINE = MergeTree ORDER BY id"
+    }
   ],
   "FROM system.tables": [
     {
@@ -103,7 +106,10 @@ test("parseVerifyArgs handles --changed and --diff <range>", () => {
     parseVerifyArgs(["--diff", "origin/main...HEAD"]).options.diff,
     "origin/main...HEAD"
   );
-  assert.match(parseVerifyArgs(["--diff"]).error ?? "", /--diff requires a git range/);
+  assert.match(
+    parseVerifyArgs(["--diff"]).error ?? "",
+    /--diff requires a git range/
+  );
   assert.match(
     parseVerifyArgs(["--diff", "--strict"]).error ?? "",
     /--diff requires a git range/
@@ -121,10 +127,22 @@ test("discoverConfiguredFiles walks the tree and matches config globs", async ()
     await mkdir(join(dir, "app", "models"), { recursive: true });
     await mkdir(join(dir, "migrations"), { recursive: true });
     await mkdir(join(dir, "node_modules", "pkg"), { recursive: true });
-    await writeFile(join(dir, "app", "models", "revenue.sql"), "SELECT 1", "utf8");
-    await writeFile(join(dir, "migrations", "001.sql"), "ALTER TABLE t ADD COLUMN x UInt8", "utf8");
+    await writeFile(
+      join(dir, "app", "models", "revenue.sql"),
+      "SELECT 1",
+      "utf8"
+    );
+    await writeFile(
+      join(dir, "migrations", "001.sql"),
+      "ALTER TABLE t ADD COLUMN x UInt8",
+      "utf8"
+    );
     await writeFile(join(dir, "README.md"), "# hi", "utf8");
-    await writeFile(join(dir, "node_modules", "pkg", "ignored.sql"), "SELECT 1", "utf8");
+    await writeFile(
+      join(dir, "node_modules", "pkg", "ignored.sql"),
+      "SELECT 1",
+      "utf8"
+    );
 
     const config: GozzleProjectConfig = {
       queries: ["app/**/*.sql"],
@@ -158,10 +176,10 @@ test("selectVerifiableFiles filters by config globs, else by .sql", () => {
     migrations: ["migrations/**/*.sql"],
     assumptions: {}
   };
-  assert.deepEqual(selectVerifiableFiles([...files, "dashboards/x.sql"], config), [
-    "app/models/revenue.sql",
-    "migrations/2026_add.sql"
-  ]);
+  assert.deepEqual(
+    selectVerifiableFiles([...files, "dashboards/x.sql"], config),
+    ["app/models/revenue.sql", "migrations/2026_add.sql"]
+  );
 });
 
 test("aggregateExitCode: error > findings > clean", () => {
@@ -174,18 +192,34 @@ test("aggregateExitCode: error > findings > clean", () => {
 
 test("a proven full-scan query fails the gate (exit 1)", async () => {
   const client = new FakeMetadataClient({ EXPLAIN: FULL_SCAN_EXPLAIN });
-  await withTempFile("q.sql", "-- daily\nSELECT * FROM events", async (path) => {
-    const outcomes = await verifyFiles(client, [path], "default", OPTS, NO_AUDIT);
-    assert.equal(outcomes[0].kind, "query");
-    assert.equal(outcomes[0].failing, true);
-    assert.equal(aggregateExitCode(outcomes), 1);
-  });
+  await withTempFile(
+    "q.sql",
+    "-- daily\nSELECT * FROM events",
+    async (path) => {
+      const outcomes = await verifyFiles(
+        client,
+        [path],
+        "default",
+        OPTS,
+        NO_AUDIT
+      );
+      assert.equal(outcomes[0].kind, "query");
+      assert.equal(outcomes[0].failing, true);
+      assert.equal(aggregateExitCode(outcomes), 1);
+    }
+  );
 });
 
 test("an advisory-only query passes, but fails under --strict", async () => {
   const client = new FakeMetadataClient({ EXPLAIN: PRUNED_EXPLAIN });
   await withTempFile("q.sql", "SELECT * FROM events FINAL", async (path) => {
-    const lenient = await verifyFiles(client, [path], "default", OPTS, NO_AUDIT);
+    const lenient = await verifyFiles(
+      client,
+      [path],
+      "default",
+      OPTS,
+      NO_AUDIT
+    );
     assert.equal(lenient[0].failing, false);
     assert.equal(aggregateExitCode(lenient), 0);
 
@@ -207,7 +241,13 @@ test("a metadata-only migration passes (exit 0)", async () => {
     "m.sql",
     "ALTER TABLE t ADD COLUMN x UInt8",
     async (path) => {
-      const outcomes = await verifyFiles(client, [path], "default", OPTS, NO_AUDIT);
+      const outcomes = await verifyFiles(
+        client,
+        [path],
+        "default",
+        OPTS,
+        NO_AUDIT
+      );
       assert.equal(outcomes[0].kind, "migration");
       assert.equal(outcomes[0].failing, false);
       assert.equal(aggregateExitCode(outcomes), 0);
@@ -218,7 +258,13 @@ test("a metadata-only migration passes (exit 0)", async () => {
 test("an unknown statement is an operational error (exit 2)", async () => {
   const client = new FakeMetadataClient({});
   await withTempFile("x.sql", "INSERT INTO t VALUES (1)", async (path) => {
-    const outcomes = await verifyFiles(client, [path], "default", OPTS, NO_AUDIT);
+    const outcomes = await verifyFiles(
+      client,
+      [path],
+      "default",
+      OPTS,
+      NO_AUDIT
+    );
     assert.equal(outcomes[0].errored, true);
     assert.equal(aggregateExitCode(outcomes), 2);
   });

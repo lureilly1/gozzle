@@ -3,10 +3,7 @@ import test from "node:test";
 
 import type { ClickHouseMetadataClient } from "../src/clickhouse/client.js";
 import { discoverWorkload } from "../src/clickhouse/query-log.js";
-import {
-  formatWorkload,
-  parseDiscoverArgs
-} from "../src/commands/discover.js";
+import { formatWorkload, parseDiscoverArgs } from "../src/commands/discover.js";
 
 class FakeClient implements ClickHouseMetadataClient {
   readonly queries: string[] = [];
@@ -40,7 +37,9 @@ test("discoverWorkload ranks queries and flags ReplacingMergeTree tables", async
     ]
   });
 
-  const workload = await discoverWorkload(client, { defaultDatabase: "analytics" });
+  const workload = await discoverWorkload(client, {
+    defaultDatabase: "analytics"
+  });
   assert.equal(workload.length, 1);
   assert.equal(workload[0].runs, 8400);
   assert.equal(workload[0].totalReadBytes, 12000000000);
@@ -68,7 +67,9 @@ test("discoverWorkload skips the engine lookup when no tables are seen", async (
       }
     ]
   });
-  const workload = await discoverWorkload(client, { defaultDatabase: "default" });
+  const workload = await discoverWorkload(client, {
+    defaultDatabase: "default"
+  });
   assert.deepEqual(workload[0].replacingTables, []);
   assert.equal(
     client.queries.some((q) => q.includes("FROM system.tables")),
@@ -77,11 +78,14 @@ test("discoverWorkload skips the engine lookup when no tables are seen", async (
 });
 
 test("parseDiscoverArgs parses --since, --limit, --json and rejects junk", () => {
-  assert.deepEqual(parseDiscoverArgs(["--since", "30d", "--limit", "5", "--json"]).options, {
-    sinceDays: 30,
-    limit: 5,
-    json: true
-  });
+  assert.deepEqual(
+    parseDiscoverArgs(["--since", "30d", "--limit", "5", "--json"]).options,
+    {
+      sinceDays: 30,
+      limit: 5,
+      json: true
+    }
+  );
   assert.equal(parseDiscoverArgs(["--since", "7"]).options.sinceDays, 7);
   assert.match(parseDiscoverArgs(["--since", "soon"]).error ?? "", /--since/);
   assert.match(parseDiscoverArgs(["--limit", "0"]).error ?? "", /--limit/);

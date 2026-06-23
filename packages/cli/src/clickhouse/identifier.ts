@@ -56,7 +56,9 @@ export function quoteStringLiteral(value: string): string {
   return `'${value.replaceAll("\\", "\\\\").replaceAll("'", "\\'")}'`;
 }
 
-export function formatTableIdentifier(identifier: ResolvedTableIdentifier): string {
+export function formatTableIdentifier(
+  identifier: ResolvedTableIdentifier
+): string {
   return `${quoteIdentifier(identifier.database)}.${quoteIdentifier(identifier.table)}`;
 }
 
@@ -67,4 +69,3 @@ function validateIdentifierPart(value: string, label: string): void {
     );
   }
 }
-

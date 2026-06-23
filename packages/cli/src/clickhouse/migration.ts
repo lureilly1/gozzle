@@ -52,7 +52,10 @@ export async function dryRunMigration(
   options: DryRunMigrationOptions
 ): Promise<DryRunMigrationResult> {
   const parsed = parseMigrationStatement(options.statement);
-  const identifier = resolveTableIdentifier(parsed.table, options.defaultDatabase);
+  const identifier = resolveTableIdentifier(
+    parsed.table,
+    options.defaultDatabase
+  );
   const inspection = await inspectTable(client, {
     table: `${identifier.database}.${identifier.table}`,
     defaultDatabase: options.defaultDatabase
@@ -64,7 +67,10 @@ export async function dryRunMigration(
   };
 
   let rewrite: MigrationRewriteEstimate;
-  if (parsed.classification === "unsupported" || parsed.rewriteScope === "none") {
+  if (
+    parsed.classification === "unsupported" ||
+    parsed.rewriteScope === "none"
+  ) {
     rewrite = emptyEstimate();
   } else if (parsed.rewriteScope === "all") {
     rewrite = {
@@ -136,5 +142,3 @@ function emptyEstimate(): MigrationRewriteEstimate {
     evidence: "none"
   };
 }
-
-

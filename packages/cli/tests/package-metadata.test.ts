@@ -7,7 +7,10 @@ import { readPackageMetadata } from "../src/shared/package-metadata.js";
 
 test("reads package metadata", () => {
   const packageJson = JSON.parse(
-    readFileSync(fileURLToPath(new URL("../package.json", import.meta.url)), "utf8")
+    readFileSync(
+      fileURLToPath(new URL("../package.json", import.meta.url)),
+      "utf8"
+    )
   ) as { version: string };
 
   assert.equal(readPackageMetadata().version, packageJson.version);

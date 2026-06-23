@@ -94,7 +94,10 @@ test("metadata-only dry run reports zero physical rewrite", async () => {
   assert.equal(result.parsed.classification, "metadata-only");
   assert.equal(result.rewrite.affectedParts, 0);
   assert.equal(result.productionExecuted, false);
-  assert.equal(client.queries.some((query) => query.includes("INNER JOIN")), false);
+  assert.equal(
+    client.queries.some((query) => query.includes("INNER JOIN")),
+    false
+  );
   const text = formatMigrationResult(result);
   assert.match(text, /Status: PASS/);
   assert.match(text, /no existing data-part rewrite expected/);
@@ -102,7 +105,8 @@ test("metadata-only dry run reports zero physical rewrite", async () => {
 
 test("MODIFY COLUMN uses table metadata as a full-table upper bound", async () => {
   const result = await dryRunMigration(new FakeMetadataClient(), {
-    statement: "ALTER TABLE analytics.events MODIFY COLUMN status LowCardinality(String)",
+    statement:
+      "ALTER TABLE analytics.events MODIFY COLUMN status LowCardinality(String)",
     defaultDatabase: "default"
   });
   assert.equal(result.rewrite.evidence, "table-metadata-upper-bound");
@@ -113,7 +117,8 @@ test("MODIFY COLUMN uses table metadata as a full-table upper bound", async () =
 test("predicate mutation estimates matching rows and full touched parts", async () => {
   const client = new FakeMetadataClient();
   const result = await dryRunMigration(client, {
-    statement: "ALTER TABLE analytics.events UPDATE status = 'done' WHERE id = 42",
+    statement:
+      "ALTER TABLE analytics.events UPDATE status = 'done' WHERE id = 42",
     defaultDatabase: "default"
   });
   assert.equal(result.rewrite.evidence, "predicate-part-scan");
@@ -121,7 +126,9 @@ test("predicate mutation estimates matching rows and full touched parts", async 
   assert.equal(result.rewrite.affectedPartRows, 500);
   assert.equal(result.rewrite.affectedParts, 2);
   assert.equal(result.rewrite.affectedBytes, 1048576);
-  const estimateQuery = client.queries.find((query) => query.includes("INNER JOIN"));
+  const estimateQuery = client.queries.find((query) =>
+    query.includes("INNER JOIN")
+  );
   assert.match(estimateQuery ?? "", /WHERE \(id = 42\)/);
   assert.match(estimateQuery ?? "", /GROUP BY _part/);
   const text = formatMigrationResult(result);
@@ -136,7 +143,10 @@ test("unsupported operation makes no rewrite claim", async () => {
   });
   assert.equal(result.parsed.classification, "unsupported");
   assert.equal(result.rewrite.evidence, "none");
-  assert.match(formatMigrationResult(result), /no cost or safety claim was inferred/);
+  assert.match(
+    formatMigrationResult(result),
+    /no cost or safety claim was inferred/
+  );
 });
 
 test("unsafe and partition-scoped predicates never reach the estimate query", async () => {

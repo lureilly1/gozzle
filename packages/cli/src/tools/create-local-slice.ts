@@ -50,7 +50,8 @@ export function createLocalSliceTool(server: McpServer): void {
               content: [{ type: "text", text: formatLocalSliceResult(result) }]
             };
           },
-          (error) => `gozzle could not create a local slice.\n\n${errorMessage(error)}`
+          (error) =>
+            `gozzle could not create a local slice.\n\n${errorMessage(error)}`
         )
       )
   );
@@ -84,4 +85,3 @@ export function formatLocalSliceResult(result: LocalSliceResult): string {
   }
   return lines.join("\n");
 }
-

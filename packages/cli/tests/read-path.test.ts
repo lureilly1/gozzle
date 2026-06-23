@@ -77,7 +77,10 @@ function diagnosis(hasFinal = false): DiagnoseQueryResult {
       hasLeadingWildcard: false,
       selectsAllColumns: true
     },
-    explain: { lines: [], tables: [{ table: "analytics.events", indexes: [] }] },
+    explain: {
+      lines: [],
+      tables: [{ table: "analytics.events", indexes: [] }]
+    },
     tableSchemas: [],
     findings: [],
     originalQueryExecuted: false

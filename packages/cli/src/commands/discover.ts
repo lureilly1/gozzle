@@ -82,7 +82,9 @@ export async function runDiscoverCommand(
     );
     return 0;
   } catch (runError) {
-    console.error(`gozzle discover could not run.\n\n${errorMessage(runError)}`);
+    console.error(
+      `gozzle discover could not run.\n\n${errorMessage(runError)}`
+    );
     return 2;
   } finally {
     await client?.close();
@@ -122,7 +124,9 @@ export function formatWorkload(
     lines.push("");
   });
 
-  const rmt = workload.filter((query) => query.replacingTables.length > 0).length;
+  const rmt = workload.filter(
+    (query) => query.replacingTables.length > 0
+  ).length;
   if (rmt > 0) {
     lines.push(
       `${rmt} of ${workload.length} read ReplacingMergeTree tables — run \`gozzle verify\` on those to check for read-path overcounting.`
@@ -135,4 +139,3 @@ function truncate(text: string, max: number): string {
   const single = text.replace(/\s+/g, " ").trim();
   return single.length > max ? `${single.slice(0, max - 1)}…` : single;
 }
-

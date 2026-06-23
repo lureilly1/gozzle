@@ -115,7 +115,8 @@ function diagnoseTable(
   const partition = findIndex(table, "Partition");
   const primary = findIndex(table, "PrimaryKey");
   const baseParts = minMax?.parts ?? partition?.parts ?? primary?.parts;
-  const finalGranules = primary?.granules ?? partition?.granules ?? minMax?.granules;
+  const finalGranules =
+    primary?.granules ?? partition?.granules ?? minMax?.granules;
 
   if (
     baseParts &&
@@ -129,8 +130,7 @@ function diagnoseTable(
       code: "full-scan",
       message: `${table.table} scans every reported part and granule.`,
       evidence: `parts ${formatRatio(baseParts)}, granules ${formatRatio(finalGranules)}`,
-      recommendation:
-        `Align filters with the partition or leading ORDER BY keys, or evaluate a projection for this access pattern.${partitionHint}${orderByHint}`
+      recommendation: `Align filters with the partition or leading ORDER BY keys, or evaluate a projection for this access pattern.${partitionHint}${orderByHint}`
     });
   }
 
@@ -146,8 +146,7 @@ function diagnoseTable(
       code: "missing-partition-pruning",
       message: `${table.table} received no partition pruning.`,
       evidence: `Partition Condition: true; parts ${formatRatio(partition.parts)}`,
-      recommendation:
-        `Filter on the partition expression with a compatible range when the query should target fewer partitions.${partitionHint}`
+      recommendation: `Filter on the partition expression with a compatible range when the query should target fewer partitions.${partitionHint}`
     });
   }
 
@@ -163,8 +162,7 @@ function diagnoseTable(
       code: "missing-primary-key-pruning",
       message: `${table.table} received no primary-key granule pruning.`,
       evidence: `PrimaryKey Condition: true; granules ${formatRatio(primary.granules)}`,
-      recommendation:
-        `Filter on a useful prefix of the ORDER BY key without wrapping key columns in incompatible functions.${orderByHint}`
+      recommendation: `Filter on a useful prefix of the ORDER BY key without wrapping key columns in incompatible functions.${orderByHint}`
     });
   }
 
@@ -201,8 +199,10 @@ function buildAdvisories(
       confidence: "advisory",
       severity: "medium",
       code: "leading-wildcard",
-      message: "A leading-wildcard LIKE predicate usually cannot use ordered-key ranges.",
-      recommendation: "Consider a text index or a different predicate shape for substring search."
+      message:
+        "A leading-wildcard LIKE predicate usually cannot use ordered-key ranges.",
+      recommendation:
+        "Consider a text index or a different predicate shape for substring search."
     });
   }
   if (query.hasCrossJoin || query.joinCount > 1) {
@@ -223,7 +223,8 @@ function buildAdvisories(
       severity: "low",
       code: "select-star",
       message: "SELECT * may read columns the caller does not need.",
-      recommendation: "Project only required columns for repeated or high-volume queries."
+      recommendation:
+        "Project only required columns for repeated or high-volume queries."
     });
   }
   if (explain.tables.length === 0) {
@@ -246,7 +247,10 @@ function findIndex(
   return table.indexes.find((index) => index.type === type);
 }
 
-function selectsEverything(ratio: { selected: number; total: number }): boolean {
+function selectsEverything(ratio: {
+  selected: number;
+  total: number;
+}): boolean {
   return ratio.total > 0 && ratio.selected === ratio.total;
 }
 

@@ -125,9 +125,7 @@ async function readReadonlySetting(
 
     return row ? String(row.value) : undefined;
   } catch (error) {
-    warnings.push(
-      `Could not inspect readonly setting: ${errorMessage(error)}`
-    );
+    warnings.push(`Could not inspect readonly setting: ${errorMessage(error)}`);
     return undefined;
   }
 }
@@ -156,5 +154,3 @@ async function readWritePrivileges(
     return [];
   }
 }
-
-

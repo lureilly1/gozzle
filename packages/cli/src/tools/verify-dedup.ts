@@ -26,7 +26,9 @@ export function createVerifyDedupTool(server: McpServer): void {
           .min(1)
           .max(50)
           .optional()
-          .describe("How many duplicated keys to return as evidence (default 5)."),
+          .describe(
+            "How many duplicated keys to return as evidence (default 5)."
+          ),
         partitionId: z
           .string()
           .min(1)
@@ -50,25 +52,22 @@ export function createVerifyDedupTool(server: McpServer): void {
       }
     },
     async ({ table, sampleLimit, partitionId }) =>
-      runAuditedTool(
-        "verify_dedup",
-        { table, sampleLimit, partitionId },
-        () =>
-          withClickHouseTool(async (client, config) => {
-            const scanGuard = readDedupScanGuard();
-            const result = await verifyDedup(client, {
-              table,
-              defaultDatabase: config.database ?? "default",
-              sampleLimit,
-              partitionId,
-              maxScanRows: scanGuard.maxScanRows,
-              maxScanBytes: scanGuard.maxScanBytes
-            });
-            return {
-              content: [{ type: "text", text: formatDedupResult(result) }],
-              structuredContent: buildDedupStructured(result)
-            };
-          }, formatDedupError)
+      runAuditedTool("verify_dedup", { table, sampleLimit, partitionId }, () =>
+        withClickHouseTool(async (client, config) => {
+          const scanGuard = readDedupScanGuard();
+          const result = await verifyDedup(client, {
+            table,
+            defaultDatabase: config.database ?? "default",
+            sampleLimit,
+            partitionId,
+            maxScanRows: scanGuard.maxScanRows,
+            maxScanBytes: scanGuard.maxScanBytes
+          });
+          return {
+            content: [{ type: "text", text: formatDedupResult(result) }],
+            structuredContent: buildDedupStructured(result)
+          };
+        }, formatDedupError)
       )
   );
 }
@@ -204,15 +203,17 @@ export function readDedupScanGuard(
   };
 }
 
-
 function formatDedupError(error: unknown): string {
   const message = errorMessage(error);
   const base = `gozzle could not verify deduplication.\n\n${message}`;
   // A read-limit or timeout abort means the table is too big for a single-pass
   // proof; steer the caller to the cheaper, scoped path.
-  if (/max_execution_time|TIMEOUT_EXCEEDED|Limit for|too many|memory limit/i.test(message)) {
+  if (
+    /max_execution_time|TIMEOUT_EXCEEDED|Limit for|too many|memory limit/i.test(
+      message
+    )
+  ) {
     return `${base}\n\nThis table is likely too large to prove in one pass. Re-run verify_dedup with a partitionId to scope to one partition, or create a local slice.`;
   }
   return base;
 }
-

@@ -250,7 +250,10 @@ function selectPartition(
   return partitions[0];
 }
 
-function enforceBudget(partition: PartitionRow, config: LocalSliceConfig): void {
+function enforceBudget(
+  partition: PartitionRow,
+  config: LocalSliceConfig
+): void {
   const rows = toNumber(partition.rows);
   const bytes = toNumber(partition.bytes_on_disk);
   if (rows > config.maxRows) {
@@ -291,9 +294,7 @@ function buildExportQuery(
   )} WHERE _partition_id = ${quoteStringLiteral(partitionId)}`;
 }
 
-export function buildLocalCreateStatement(
-  inspection: TableInspection
-): string {
+export function buildLocalCreateStatement(inspection: TableInspection): string {
   const columns = inspection.columns.map(formatColumn).join(",\n  ");
   const replacing = inspection.replacingMergeTree;
   const engineArguments = [
@@ -304,7 +305,9 @@ export function buildLocalCreateStatement(
     "CREATE DATABASE IF NOT EXISTS gozzle_slice",
     `CREATE TABLE gozzle_slice.${quoteIdentifier(inspection.identifier.table)} (\n  ${columns}\n)`,
     `ENGINE = ReplacingMergeTree(${engineArguments.join(", ")})`,
-    inspection.partitionBy ? `PARTITION BY ${inspection.partitionBy}` : undefined,
+    inspection.partitionBy
+      ? `PARTITION BY ${inspection.partitionBy}`
+      : undefined,
     `ORDER BY ${inspection.sortingKey}`,
     inspection.primaryKey && inspection.primaryKey !== inspection.sortingKey
       ? `PRIMARY KEY ${inspection.primaryKey}`
@@ -335,12 +338,13 @@ function isInsertableColumn(column: TableColumn): boolean {
   );
 }
 
-function proofsMatch(source: VerifyDedupResult, local: VerifyDedupResult): boolean {
+function proofsMatch(
+  source: VerifyDedupResult,
+  local: VerifyDedupResult
+): boolean {
   return (
     source.duplicateGroups === local.duplicateGroups &&
     source.duplicateRows === local.duplicateRows &&
     source.maxCopies === local.maxCopies
   );
 }
-
-

@@ -184,7 +184,9 @@ export async function verifyDedup(
   // partition this equals `duplicateRows`, so skip the extra scan.
   let finalCollapsibleRows = duplicateRows;
   if (!singleScope) {
-    const [globalRow] = await client.queryJson<{ final_dups: string | number }>(`
+    const [globalRow] = await client.queryJson<{
+      final_dups: string | number;
+    }>(`
       SELECT count() - uniqExact(${sortingKey}) AS final_dups
       FROM ${fullTableName}
       ${partitionFilter}
@@ -281,5 +283,3 @@ async function readLargestPartitions(
     bytes: toNumber(row.bytes)
   }));
 }
-
-

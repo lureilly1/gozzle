@@ -64,8 +64,14 @@ test("lists valid, corrupt, and incomplete slices with actual storage", async (t
 
   const slices = await listLocalSlices(root);
   assert.equal(slices.length, 4);
-  assert.equal(slices.find((slice) => slice.id === "slice-new")?.state, "valid");
-  assert.equal(slices.find((slice) => slice.id === "slice-invalid")?.state, "corrupt");
+  assert.equal(
+    slices.find((slice) => slice.id === "slice-new")?.state,
+    "valid"
+  );
+  assert.equal(
+    slices.find((slice) => slice.id === "slice-invalid")?.state,
+    "corrupt"
+  );
   const incomplete = slices.find((slice) => slice.id === "slice-incomplete");
   assert.equal(incomplete?.state, "incomplete");
   assert.equal(incomplete?.sizeBytes, 5);
@@ -119,7 +125,10 @@ test("age cleanup removes only old valid slices", async (t) => {
     olderThanMs: 7 * 24 * 60 * 60 * 1000,
     now: new Date("2026-06-20T00:00:00.000Z")
   });
-  assert.deepEqual(result.removed.map((slice) => slice.id), ["slice-old"]);
+  assert.deepEqual(
+    result.removed.map((slice) => slice.id),
+    ["slice-old"]
+  );
   assert.equal((await listLocalSlices(root)).length, 2);
 });
 
@@ -133,11 +142,14 @@ test("invalid cleanup explicitly removes corrupt and incomplete direct children"
   await writeFile(join(root, "unmanaged", "keep.txt"), "keep");
 
   const result = await cleanLocalSlices(root, { invalid: true });
-  assert.deepEqual(
-    result.removed.map((slice) => slice.id).sort(),
-    ["slice-corrupt", "slice-incomplete"]
+  assert.deepEqual(result.removed.map((slice) => slice.id).sort(), [
+    "slice-corrupt",
+    "slice-incomplete"
+  ]);
+  assert.equal(
+    await readFile(join(root, "unmanaged", "keep.txt"), "utf8"),
+    "keep"
   );
-  assert.equal(await readFile(join(root, "unmanaged", "keep.txt"), "utf8"), "keep");
 });
 
 test("invalid cleanup cannot remove a valid workspace", async (t) => {
@@ -178,7 +190,10 @@ test("slices CLI lists and cleans a persisted slice", async (t) => {
     { env }
   );
   assert.match(listed.stdout, /WARNING: Local slices contain production data/);
-  assert.match(listed.stdout, /slice-cli.*valid.*analytics\.events.*size=.*verified/);
+  assert.match(
+    listed.stdout,
+    /slice-cli.*valid.*analytics\.events.*size=.*verified/
+  );
   assert.match(listed.stdout, /Total: .* in 1 workspace/);
 
   const cleaned = await execFileAsync(

@@ -2,7 +2,10 @@
 
 import { readPackageMetadata } from "./shared/package-metadata.js";
 import { readLocalSliceConfig } from "./config/local-slice.js";
-import { cleanLocalSlices, listLocalSlices } from "./local-engine/slice-store.js";
+import {
+  cleanLocalSlices,
+  listLocalSlices
+} from "./local-engine/slice-store.js";
 import { isHostId, renderInit } from "./init/mcp-config.js";
 import { renderSkill } from "./init/agent-skill.js";
 import { runVerifyCommand } from "./commands/verify.js";
@@ -31,7 +34,8 @@ const commands: Record<string, Command> = {
   },
   discover: {
     usage: "discover",
-    summary: "Rank recent SELECTs from system.query_log (--since 7d, --limit N)",
+    summary:
+      "Rank recent SELECTs from system.query_log (--since 7d, --limit N)",
     run: (args) => runDiscoverCommand(args)
   },
   equivalent: {
@@ -67,7 +71,8 @@ const commands: Record<string, Command> = {
   },
   hook: {
     usage: "hook",
-    summary: "Print the PostToolUse hook recipe (gozzle hook run = the runtime)",
+    summary:
+      "Print the PostToolUse hook recipe (gozzle hook run = the runtime)",
     run: (args) => {
       if (args[0] === "run") return runHookRun();
       console.log(renderHookRecipe(args.includes("--local")));
@@ -117,7 +122,9 @@ function printHelp(): void {
   for (const c of Object.values(commands)) {
     console.log(`  gozzle ${c.usage.padEnd(width)}  ${c.summary}`);
   }
-  console.log(`  ${"gozzle-mcp".padEnd(width + "gozzle ".length)}  Start the MCP stdio server`);
+  console.log(
+    `  ${"gozzle-mcp".padEnd(width + "gozzle ".length)}  Start the MCP stdio server`
+  );
 }
 
 async function runSlicesCommand(args: string[]): Promise<void> {
@@ -147,21 +154,30 @@ async function runSlicesCommand(args: string[]): Promise<void> {
             ? manifest.proof.matched
               ? "verified"
               : "proof-mismatch"
-            : slice.detail ?? "-"
+            : (slice.detail ?? "-")
         ].join("\t")
       );
     }
     const total = slices.reduce((bytes, slice) => bytes + slice.sizeBytes, 0);
-    console.log(`Total: ${formatBytes(total)} in ${slices.length} workspace(s)`);
+    console.log(
+      `Total: ${formatBytes(total)} in ${slices.length} workspace(s)`
+    );
     return;
   }
   if (action === "clean") {
     const targets = args.slice(1);
     if (targets.length === 0) fail(slicesUsage());
-    const result = await cleanLocalSlices(config.rootDirectory, cleanOptions(targets));
+    const result = await cleanLocalSlices(
+      config.rootDirectory,
+      cleanOptions(targets)
+    );
     for (const slice of result.removed) console.log(`Removed ${slice.id}`);
-    if (result.removed.length === 0 && result.missing.length === 0) console.log("No local slices to remove.");
-    if (result.missing.length > 0) fail(`Slice not found or cleanup mode not permitted for its state: ${result.missing.join(", ")}`);
+    if (result.removed.length === 0 && result.missing.length === 0)
+      console.log("No local slices to remove.");
+    if (result.missing.length > 0)
+      fail(
+        `Slice not found or cleanup mode not permitted for its state: ${result.missing.join(", ")}`
+      );
     const remaining = await listLocalSlices(config.rootDirectory);
     const remainingBytes = remaining.reduce(
       (bytes, slice) => bytes + slice.sizeBytes,

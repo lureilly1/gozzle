@@ -32,10 +32,7 @@ test("defaults username and password for ClickHouse config", () => {
 });
 
 test("requires a ClickHouse URL", () => {
-  assert.throws(
-    () => readClickHouseConfig({}),
-    /Missing ClickHouse URL/
-  );
+  assert.throws(() => readClickHouseConfig({}), /Missing ClickHouse URL/);
 });
 
 test("requires an http or https ClickHouse URL", () => {
@@ -47,4 +44,3 @@ test("requires an http or https ClickHouse URL", () => {
     /must use http or https/
   );
 });
-

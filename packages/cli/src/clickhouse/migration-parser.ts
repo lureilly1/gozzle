@@ -43,7 +43,12 @@ export function parseMigrationStatement(input: string): ParsedMigration {
   const upper = operation.toUpperCase();
 
   if (startsWithWords(upper, "ON CLUSTER")) {
-    return unsupported(statement, table, operation, "ON CLUSTER ALTERs are not supported in the MVP.");
+    return unsupported(
+      statement,
+      table,
+      operation,
+      "ON CLUSTER ALTERs are not supported in the MVP."
+    );
   }
   if (!startsWithWords(upper, "UPDATE") && hasTopLevelComma(operation)) {
     return unsupported(
@@ -90,7 +95,10 @@ export function parseMigrationStatement(input: string): ParsedMigration {
     );
   }
 
-  if (/^ADD\s+COLUMN\b/i.test(operation) && /\bMATERIALIZED\b/i.test(operation)) {
+  if (
+    /^ADD\s+COLUMN\b/i.test(operation) &&
+    /\bMATERIALIZED\b/i.test(operation)
+  ) {
     return createResult(
       statement,
       table,
@@ -159,7 +167,12 @@ function parsePredicateMutation(
 ): ParsedMigration {
   const whereIndex = findTopLevelKeyword(operation, "WHERE");
   if (whereIndex === -1) {
-    return unsupported(statement, table, operation, `${kind} mutation has no top-level WHERE predicate.`);
+    return unsupported(
+      statement,
+      table,
+      operation,
+      `${kind} mutation has no top-level WHERE predicate.`
+    );
   }
   const mutationPrefix = operation.slice(0, whereIndex);
   if (findTopLevelWords(mutationPrefix, "IN PARTITION") !== -1) {
@@ -180,7 +193,12 @@ function parsePredicateMutation(
       : predicateAndSettings.slice(0, settingsIndex)
   ).trim();
   if (!predicate) {
-    return unsupported(statement, table, operation, `${kind} mutation has an empty WHERE predicate.`);
+    return unsupported(
+      statement,
+      table,
+      operation,
+      `${kind} mutation has an empty WHERE predicate.`
+    );
   }
   if (containsUnquotedWord(predicate, "SELECT")) {
     return unsupported(
@@ -238,7 +256,15 @@ function createResult(
   reason: string,
   advice: string
 ): ParsedMigration {
-  return { statement, table, operation, classification, rewriteScope, reason, advice };
+  return {
+    statement,
+    table,
+    operation,
+    classification,
+    rewriteScope,
+    reason,
+    advice
+  };
 }
 
 function isMetadataOnly(operation: string): boolean {
@@ -278,9 +304,13 @@ function normalizeStatement(input: string): string {
   const trimmed = input.trim();
   if (!trimmed) throw new Error("Migration statement is required.");
   if (/--|\/\*/.test(trimmed)) {
-    throw new Error("SQL comments are not accepted in dry_run_migration statements.");
+    throw new Error(
+      "SQL comments are not accepted in dry_run_migration statements."
+    );
   }
-  const normalized = trimmed.endsWith(";") ? trimmed.slice(0, -1).trimEnd() : trimmed;
+  const normalized = trimmed.endsWith(";")
+    ? trimmed.slice(0, -1).trimEnd()
+    : trimmed;
   if (normalized.includes(";")) {
     throw new Error("dry_run_migration accepts exactly one statement.");
   }
@@ -318,4 +348,3 @@ function findExternalAccessFunction(input: string): string | undefined {
   );
   return match?.[1];
 }
-

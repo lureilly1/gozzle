@@ -61,7 +61,10 @@ class ChdbMetadataClient implements ClickHouseMetadataClient {
 
   async queryJson<T>(query: string): Promise<T[]> {
     this.assertOpen();
-    const output = this.session.query(stripTrailingSemicolon(query), "JSONEachRow");
+    const output = this.session.query(
+      stripTrailingSemicolon(query),
+      "JSONEachRow"
+    );
     return output
       .split("\n")
       .map((line) => line.trim())
@@ -86,4 +89,3 @@ class ChdbMetadataClient implements ClickHouseMetadataClient {
 function stripTrailingSemicolon(query: string): string {
   return query.trim().replace(/;$/, "");
 }
-

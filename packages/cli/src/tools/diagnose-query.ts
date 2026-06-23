@@ -1,4 +1,3 @@
-
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
@@ -23,7 +22,9 @@ export function createDiagnoseQueryTool(server: McpServer): void {
         query: z
           .string()
           .min(1)
-          .describe("One ClickHouse SELECT or WITH ... SELECT query to diagnose.")
+          .describe(
+            "One ClickHouse SELECT or WITH ... SELECT query to diagnose."
+          )
       },
       outputSchema: {
         status: z.enum(["pass", "warn", "fail"]),
@@ -93,7 +94,8 @@ export function formatQueryDiagnosis(result: DiagnoseQueryResult): string {
       lines.push(`- ${table.table}`);
       const schema = result.tableSchemas.find((s) => s.table === table.table);
       if (schema?.orderBy) lines.push(`  ORDER BY: ${schema.orderBy}`);
-      if (schema?.partitionBy) lines.push(`  PARTITION BY: ${schema.partitionBy}`);
+      if (schema?.partitionBy)
+        lines.push(`  PARTITION BY: ${schema.partitionBy}`);
       for (const index of table.indexes) {
         const details = [
           index.condition ? `condition=${index.condition}` : undefined,
@@ -163,7 +165,6 @@ function appendFindings(
     lines.push(`  Recommendation: ${finding.recommendation}`);
   }
 }
-
 
 function formatDiagnosticError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);

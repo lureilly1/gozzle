@@ -52,7 +52,9 @@ export function validateDiagnosticQuery(input: string): ValidatedQuery {
   const startsWithWith = /^WITH\b/i.test(query);
 
   if (!startsWithSelect && !startsWithWith) {
-    throw new Error("diagnose_query accepts only SELECT or WITH ... SELECT queries.");
+    throw new Error(
+      "diagnose_query accepts only SELECT or WITH ... SELECT queries."
+    );
   }
 
   if (startsWithWith && findTopLevelKeyword(query, "SELECT") === -1) {
@@ -61,7 +63,9 @@ export function validateDiagnosticQuery(input: string): ValidatedQuery {
 
   for (const clause of ["INTO OUTFILE", "INTO DUMPFILE"]) {
     if (findTopLevelWords(query, clause) !== -1) {
-      throw new Error(`Top-level ${clause} is not supported by diagnose_query.`);
+      throw new Error(
+        `Top-level ${clause} is not supported by diagnose_query.`
+      );
     }
   }
 
@@ -75,9 +79,7 @@ export function validateDiagnosticQuery(input: string): ValidatedQuery {
   const settingsIndex = findTopLevelKeyword(query, "SETTINGS");
   if (
     settingsIndex !== -1 &&
-    /^SETTINGS\s+[A-Za-z_][A-Za-z0-9_]*\s*=/i.test(
-      query.slice(settingsIndex)
-    )
+    /^SETTINGS\s+[A-Za-z_][A-Za-z0-9_]*\s*=/i.test(query.slice(settingsIndex))
   ) {
     throw new Error("Top-level SETTINGS is not supported by diagnose_query.");
   }

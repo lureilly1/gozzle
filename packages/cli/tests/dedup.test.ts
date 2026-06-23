@@ -148,7 +148,10 @@ test("verify_dedup distinguishes merge vs FINAL on partitioned tables", async ()
   const output = formatDedupResult(result);
   assert.match(output, /Background merges collapse 1 row\(s\)/);
   assert.match(output, /SELECT \.\.\. FINAL collapses 3 row\(s\)/);
-  assert.match(output, /cross-partition duplicates that background merges never remove/);
+  assert.match(
+    output,
+    /cross-partition duplicates that background merges never remove/
+  );
 });
 
 class TrackingFakeMetadataClient implements ClickHouseMetadataClient {
@@ -243,7 +246,12 @@ test("verify_dedup refuses an oversized unscoped table and lists partitions", as
     ],
     "FROM system.columns": [],
     active_parts: [
-      { active_parts: "3", rows: "5000", bytes_on_disk: "5000", partitions: "2" }
+      {
+        active_parts: "3",
+        rows: "5000",
+        bytes_on_disk: "5000",
+        partitions: "2"
+      }
     ],
     "rows DESC": [
       { partition_id: "202401", rows: "3000", bytes: "3000" },

@@ -44,7 +44,10 @@ test("detects ClickHouse Cloud from hostname", () => {
     detectDeployment("https://abc123.us-east-1.aws.clickhouse.cloud:8443"),
     "cloud"
   );
-  assert.equal(detectDeployment("http://localhost:8123"), "self_hosted_or_unknown");
+  assert.equal(
+    detectDeployment("http://localhost:8123"),
+    "self_hosted_or_unknown"
+  );
 });
 
 test("inspects connection metadata and warns on write grants", async () => {
@@ -123,4 +126,3 @@ test("continues when readonly and grant inspection are unavailable", async () =>
   assert.match(info.warnings.join("\n"), /Could not inspect readonly setting/);
   assert.match(info.warnings.join("\n"), /Could not inspect grants/);
 });
-

@@ -1,6 +1,9 @@
 // Shared parsing for environment-variable config values.
 
-export function readBoolean(value: string | undefined, fallback: boolean): boolean {
+export function readBoolean(
+  value: string | undefined,
+  fallback: boolean
+): boolean {
   if (value === undefined || value.trim() === "") {
     return fallback;
   }

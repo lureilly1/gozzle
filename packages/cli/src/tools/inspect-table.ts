@@ -2,7 +2,10 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorMessage } from "../shared/errors.js";
 import { z } from "zod";
 
-import { inspectTable, type TableInspection } from "../clickhouse/table-inspection.js";
+import {
+  inspectTable,
+  type TableInspection
+} from "../clickhouse/table-inspection.js";
 import { runAuditedTool } from "../shared/audit.js";
 import { withClickHouseTool } from "./with-clickhouse.js";
 
@@ -29,10 +32,13 @@ export function createInspectTableTool(server: McpServer): void {
               defaultDatabase: config.database ?? "default"
             });
             return {
-              content: [{ type: "text", text: formatTableInspection(inspection) }]
+              content: [
+                { type: "text", text: formatTableInspection(inspection) }
+              ]
             };
           },
-          (error) => `gozzle could not inspect the table.\n\n${errorMessage(error)}`
+          (error) =>
+            `gozzle could not inspect the table.\n\n${errorMessage(error)}`
         )
       )
   );
@@ -76,4 +82,3 @@ export function formatTableInspection(inspection: TableInspection): string {
 
   return lines.join("\n");
 }
-

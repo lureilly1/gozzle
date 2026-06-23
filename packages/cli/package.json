@@ -21,7 +21,7 @@
     "build": "tsc -p tsconfig.json",
     "dev:mcp": "tsx src/mcp/server.ts",
     "dev": "tsx src/cli.ts",
-    "lint": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
     "prepublishOnly": "npm run build && npm test",
     "smoke:mcp": "npm run build && node dist/scripts/mcp-smoke.js",
     "test": "node --import tsx --test tests/*.test.ts",

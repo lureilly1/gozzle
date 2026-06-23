@@ -7,7 +7,9 @@ export interface PackageMetadata {
 }
 
 export function readPackageMetadata(): PackageMetadata {
-  const packageJsonPath = findPackageJson(dirname(fileURLToPath(import.meta.url)));
+  const packageJsonPath = findPackageJson(
+    dirname(fileURLToPath(import.meta.url))
+  );
 
   if (packageJsonPath) {
     const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf8")) as {

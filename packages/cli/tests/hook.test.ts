@@ -32,11 +32,15 @@ test("extractSqlPaths pulls an existing .sql file from a PostToolUse payload", a
 
 test("extractSqlPaths ignores non-SQL, missing files, and bad JSON", async () => {
   assert.deepEqual(
-    extractSqlPaths(JSON.stringify({ tool_input: { file_path: "/tmp/app.ts" } })),
+    extractSqlPaths(
+      JSON.stringify({ tool_input: { file_path: "/tmp/app.ts" } })
+    ),
     []
   );
   assert.deepEqual(
-    extractSqlPaths(JSON.stringify({ tool_input: { file_path: "/no/such/x.sql" } })),
+    extractSqlPaths(
+      JSON.stringify({ tool_input: { file_path: "/no/such/x.sql" } })
+    ),
     []
   );
   assert.deepEqual(extractSqlPaths("not json"), []);

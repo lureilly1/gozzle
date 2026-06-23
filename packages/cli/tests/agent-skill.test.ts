@@ -20,7 +20,10 @@ test("renderSkill with a host shows only that host's placement", () => {
 });
 
 test("the instruction tells the agent to treat gozzle as ground truth and that it is read-only", () => {
-  assert.match(AGENT_INSTRUCTION, /verify it with gozzle before giving a final answer/i);
+  assert.match(
+    AGENT_INSTRUCTION,
+    /verify it with gozzle before giving a final answer/i
+  );
   assert.match(AGENT_INSTRUCTION, /ground truth/i);
   assert.match(AGENT_INSTRUCTION, /read-only/i);
   assert.match(AGENT_INSTRUCTION, /read-path violation/i);

@@ -84,7 +84,11 @@ export function parseVerifyArgs(argv: string[]): ParsedVerifyArgs {
     else if (arg === "--diff") {
       const range = argv[i + 1];
       if (!range || range.startsWith("--")) {
-        return { files, options, error: "--diff requires a git range, e.g. origin/main...HEAD" };
+        return {
+          files,
+          options,
+          error: "--diff requires a git range, e.g. origin/main...HEAD"
+        };
       }
       options.diff = range;
       i += 1;
@@ -134,7 +138,10 @@ async function verifyFile(
   try {
     raw = await readFile(file, "utf8");
   } catch (error) {
-    const outcome = operationalError(file, `could not read file: ${errorMessage(error)}`);
+    const outcome = operationalError(
+      file,
+      `could not read file: ${errorMessage(error)}`
+    );
     await audit(env, file, "error", start);
     return outcome;
   }
@@ -153,10 +160,14 @@ async function verifyFile(
         env
       );
       const proven = result.findings.filter((f) => f.confidence === "proven");
-      const advisory = result.findings.filter((f) => f.confidence === "advisory");
+      const advisory = result.findings.filter(
+        (f) => f.confidence === "advisory"
+      );
       const violated = readPaths.some((r) => r.status === "violated");
       const failing =
-        proven.length > 0 || violated || (options.strict && advisory.length > 0);
+        proven.length > 0 ||
+        violated ||
+        (options.strict && advisory.length > 0);
       await audit(env, file, "ok", start);
       return {
         file,
@@ -234,9 +245,7 @@ export function aggregateExitCode(outcomes: FileOutcome[]): number {
 }
 
 export function renderHuman(outcomes: FileOutcome[]): string {
-  const blocks = outcomes.map(
-    (o) => `▸ ${o.file}  (${o.label})\n${o.text}`
-  );
+  const blocks = outcomes.map((o) => `▸ ${o.file}  (${o.label})\n${o.text}`);
   const failed = outcomes.filter((o) => o.failing || o.errored).length;
   const mark = failed === 0 ? "✓" : "✗";
   blocks.push(
@@ -344,4 +353,3 @@ async function audit(
     env
   );
 }
-

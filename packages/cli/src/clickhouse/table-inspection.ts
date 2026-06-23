@@ -145,14 +145,20 @@ export async function inspectTable(
   const [parts] = partsRows;
 
   if (!table) {
-    throw new Error(`Table not found: ${identifier.database}.${identifier.table}`);
+    throw new Error(
+      `Table not found: ${identifier.database}.${identifier.table}`
+    );
   }
 
   const createStatement = showCreate?.statement ?? "";
   const engineFull = table.engine_full || table.engine;
   const isReplacingMergeTree = table.engine.includes("ReplacingMergeTree");
   const isDistributed = table.engine === "Distributed";
-  const warnings = buildWarnings(table.engine, isReplacingMergeTree, isDistributed);
+  const warnings = buildWarnings(
+    table.engine,
+    isReplacingMergeTree,
+    isDistributed
+  );
   const replacingMergeTree = isReplacingMergeTree
     ? parseReplacingMergeTreeDetails(engineFull)
     : undefined;
@@ -274,7 +280,9 @@ function buildWarnings(
   }
 
   if (!engine.includes("MergeTree") && !isDistributed) {
-    warnings.push(`Unsupported or uncommon table engine for MVP checks: ${engine}.`);
+    warnings.push(
+      `Unsupported or uncommon table engine for MVP checks: ${engine}.`
+    );
   }
 
   return warnings;
@@ -293,5 +301,3 @@ function toTableColumn(row: SystemColumnRow): TableColumn {
 function normalizeOptional(value: string | undefined): string | undefined {
   return value && value.trim() !== "" ? value : undefined;
 }
-
-

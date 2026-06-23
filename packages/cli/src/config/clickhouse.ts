@@ -63,4 +63,3 @@ function validateUrl(url: string): void {
     throw new Error("ClickHouse URL must use http or https.");
   }
 }
-

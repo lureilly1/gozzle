@@ -4,9 +4,14 @@ import test from "node:test";
 import { validateDiagnosticQuery } from "../src/clickhouse/query-validator.js";
 
 test("accepts SELECT and WITH queries", () => {
-  assert.equal(validateDiagnosticQuery("SELECT count() FROM events").query, "SELECT count() FROM events");
   assert.equal(
-    validateDiagnosticQuery("WITH 42 AS tenant SELECT * FROM events WHERE tenant_id = tenant").selectsAllColumns,
+    validateDiagnosticQuery("SELECT count() FROM events").query,
+    "SELECT count() FROM events"
+  );
+  assert.equal(
+    validateDiagnosticQuery(
+      "WITH 42 AS tenant SELECT * FROM events WHERE tenant_id = tenant"
+    ).selectsAllColumns,
     true
   );
 });
@@ -44,9 +49,15 @@ test("rejects non-SELECT, multiple statements, and output clauses", () => {
 test("rejects external table functions", () => {
   for (const [query, functionName] of [
     ["SELECT * FROM s3('https://example.com/a.parquet')", "s3"],
-    ["SELECT * FROM s3Cluster('cluster', 'https://example.com/a.parquet')", "s3Cluster"],
+    [
+      "SELECT * FROM s3Cluster('cluster', 'https://example.com/a.parquet')",
+      "s3Cluster"
+    ],
     ["SELECT * FROM filesystem()", "filesystem"],
-    ["SELECT * FROM clusterAllReplicas('cluster', system, numbers)", "clusterAllReplicas"]
+    [
+      "SELECT * FROM clusterAllReplicas('cluster', system, numbers)",
+      "clusterAllReplicas"
+    ]
   ]) {
     assert.throws(
       () => validateDiagnosticQuery(query),

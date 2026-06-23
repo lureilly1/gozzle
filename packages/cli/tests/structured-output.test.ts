@@ -77,13 +77,23 @@ function migrationResult(
 }
 
 test("buildMigrationStructured derives status from classification", () => {
-  assert.equal(buildMigrationStructured(migrationResult("metadata-only")).status, "pass");
-  assert.equal(buildMigrationStructured(migrationResult("part-rewriting")).status, "review");
   assert.equal(
-    buildMigrationStructured(migrationResult("risky-materialized-column")).status,
+    buildMigrationStructured(migrationResult("metadata-only")).status,
+    "pass"
+  );
+  assert.equal(
+    buildMigrationStructured(migrationResult("part-rewriting")).status,
     "review"
   );
-  assert.equal(buildMigrationStructured(migrationResult("unsupported")).status, "unknown");
+  assert.equal(
+    buildMigrationStructured(migrationResult("risky-materialized-column"))
+      .status,
+    "review"
+  );
+  assert.equal(
+    buildMigrationStructured(migrationResult("unsupported")).status,
+    "unknown"
+  );
   const s = buildMigrationStructured(migrationResult("metadata-only"));
   assert.equal(s.table, "analytics.events");
   assert.match(s.statementSha256, HEX64);
@@ -123,8 +133,14 @@ const advisory: QueryFinding = {
 };
 
 test("buildDiagnosisStructured derives status and passes through tables/findings", () => {
-  assert.equal(buildDiagnosisStructured(diagnosisResult([proven])).status, "fail");
-  assert.equal(buildDiagnosisStructured(diagnosisResult([advisory])).status, "warn");
+  assert.equal(
+    buildDiagnosisStructured(diagnosisResult([proven])).status,
+    "fail"
+  );
+  assert.equal(
+    buildDiagnosisStructured(diagnosisResult([advisory])).status,
+    "warn"
+  );
   assert.equal(buildDiagnosisStructured(diagnosisResult([])).status, "pass");
   const s = buildDiagnosisStructured(diagnosisResult([proven, advisory]));
   assert.equal(s.findings.length, 2);

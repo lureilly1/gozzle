@@ -42,7 +42,12 @@ class SchemaAwareClient implements ClickHouseMetadataClient {
     }
     if (query.includes("FROM system.parts")) {
       return [
-        { active_parts: "4", rows: "1000", bytes_on_disk: "100000", partitions: "2" }
+        {
+          active_parts: "4",
+          rows: "1000",
+          bytes_on_disk: "100000",
+          partitions: "2"
+        }
       ] as T[];
     }
     return [];
@@ -57,7 +62,9 @@ test("diagnoseQuery attaches table ORDER BY / PARTITION BY and makes the fix con
     "default"
   );
 
-  const schema = result.tableSchemas.find((s) => s.table === "analytics.events");
+  const schema = result.tableSchemas.find(
+    (s) => s.table === "analytics.events"
+  );
   assert.equal(schema?.orderBy, "user_id, event_id");
   assert.equal(schema?.partitionBy, "toYYYYMM(ts)");
 
@@ -78,10 +85,16 @@ test("diagnoseQuery degrades gracefully when a table cannot be inspected", async
   const explainOnly: ClickHouseMetadataClient = {
     ping: async () => true,
     queryJson: async <T>(q: string): Promise<T[]> =>
-      (q.includes("EXPLAIN") ? FULL_SCAN.map((explain) => ({ explain })) : []) as T[],
+      (q.includes("EXPLAIN")
+        ? FULL_SCAN.map((explain) => ({ explain }))
+        : []) as T[],
     close: async () => {}
   };
-  const result = await diagnoseQuery(explainOnly, "SELECT * FROM analytics.events", "default");
+  const result = await diagnoseQuery(
+    explainOnly,
+    "SELECT * FROM analytics.events",
+    "default"
+  );
   assert.ok(result.findings.some((f) => f.code === "full-scan"));
   assert.equal(result.tableSchemas[0].orderBy, undefined);
 });

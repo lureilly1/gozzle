@@ -1,4 +1,3 @@
-
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
@@ -29,7 +28,9 @@ export function createVerifyEquivalentTool(server: McpServer): void {
           .min(1)
           .max(50)
           .optional()
-          .describe("How many differing rows to return as evidence (default 10).")
+          .describe(
+            "How many differing rows to return as evidence (default 10)."
+          )
       },
       outputSchema: {
         verdict: z.enum(["correct", "incorrect", "indeterminate"]),
@@ -89,7 +90,10 @@ export function formatEquivalentResult(result: VerifyEquivalentResult): string {
   ];
 
   if (result.verdict === "indeterminate") {
-    lines.push("", result.indeterminateReason ?? "Equivalence could not be proven.");
+    lines.push(
+      "",
+      result.indeterminateReason ?? "Equivalence could not be proven."
+    );
     return lines.join("\n");
   }
 
@@ -141,6 +145,3 @@ export function formatEquivalentResult(result: VerifyEquivalentResult): string {
 function formatShape(shape: { name: string; type: string }[]): string {
   return shape.map((column) => `${column.name}:${column.type}`).join(", ");
 }
-
-
-

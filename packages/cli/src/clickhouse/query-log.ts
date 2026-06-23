@@ -146,5 +146,3 @@ function clampInt(value: number | undefined, fallback: number): number {
   }
   return Math.floor(value);
 }
-
-

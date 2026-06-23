@@ -21,4 +21,3 @@ export function createHealthTool(server: McpServer): void {
       }))
   );
 }
-

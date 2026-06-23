@@ -30,7 +30,9 @@ export interface CleanLocalSlicesResult {
   bytesFreed: number;
 }
 
-export async function listLocalSlices(rootDirectory: string): Promise<StoredLocalSlice[]> {
+export async function listLocalSlices(
+  rootDirectory: string
+): Promise<StoredLocalSlice[]> {
   let entries;
   try {
     entries = await readdir(rootDirectory, { withFileTypes: true });
@@ -44,10 +46,14 @@ export async function listLocalSlices(rootDirectory: string): Promise<StoredLoca
       .filter((entry) => entry.isDirectory() && entry.name.startsWith("slice-"))
       .map((entry) => inspectWorkspace(rootDirectory, entry.name))
   );
-  return slices.sort((left, right) => workspaceTime(right) - workspaceTime(left));
+  return slices.sort(
+    (left, right) => workspaceTime(right) - workspaceTime(left)
+  );
 }
 
-export async function totalLocalSliceBytes(rootDirectory: string): Promise<number> {
+export async function totalLocalSliceBytes(
+  rootDirectory: string
+): Promise<number> {
   return (await listLocalSlices(rootDirectory)).reduce(
     (total, slice) => total + slice.sizeBytes,
     0
@@ -102,7 +108,8 @@ async function inspectWorkspace(
   rootDirectory: string,
   id: string
 ): Promise<StoredLocalSlice> {
-  if (basename(id) !== id) throw new Error(`Unsafe slice workspace name: ${id}`);
+  if (basename(id) !== id)
+    throw new Error(`Unsafe slice workspace name: ${id}`);
   const workspacePath = join(rootDirectory, id);
   const manifestPath = join(workspacePath, "manifest.json");
   const workspaceStat = await stat(workspacePath);
@@ -117,7 +124,10 @@ async function inspectWorkspace(
   try {
     const value: unknown = JSON.parse(await readFile(manifestPath, "utf8"));
     if (!isLocalSliceManifest(value)) {
-      return base("corrupt", "manifest.json does not match the supported schema");
+      return base(
+        "corrupt",
+        "manifest.json does not match the supported schema"
+      );
     }
     if (sizeError) return base("corrupt", sizeError, value);
     return base("valid", undefined, value);
@@ -125,7 +135,10 @@ async function inspectWorkspace(
     if (isNodeError(error) && error.code === "ENOENT") {
       return base("incomplete", sizeError ?? "manifest.json is missing");
     }
-    return base("corrupt", `Could not read manifest.json: ${formatError(error)}`);
+    return base(
+      "corrupt",
+      `Could not read manifest.json: ${formatError(error)}`
+    );
   }
 
   function base(

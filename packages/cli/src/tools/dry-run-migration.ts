@@ -56,7 +56,9 @@ export function createDryRunMigrationTool(server: McpServer): void {
                 defaultDatabase: config.database ?? "default"
               });
               return {
-                content: [{ type: "text", text: formatMigrationResult(result) }],
+                content: [
+                  { type: "text", text: formatMigrationResult(result) }
+                ],
                 structuredContent: buildMigrationStructured(result)
               };
             },
@@ -97,7 +99,13 @@ export function formatMigrationResult(result: DryRunMigrationResult): string {
     );
   }
 
-  lines.push("", `Advice: ${parsed.advice}`, "", "Statement:", parsed.statement);
+  lines.push(
+    "",
+    `Advice: ${parsed.advice}`,
+    "",
+    "Statement:",
+    parsed.statement
+  );
   return lines.join("\n");
 }
 
@@ -147,5 +155,3 @@ function migrationStatus(classification: string): string {
   }
   return "REVIEW — may rewrite existing data parts";
 }
-
-

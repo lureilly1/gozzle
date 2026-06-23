@@ -116,11 +116,17 @@ test("refuses query-shaping clauses in mutation predicates", () => {
 
 test("rejects comments and multiple statements", () => {
   assert.throws(
-    () => parseMigrationStatement("ALTER TABLE events ADD COLUMN x UInt8; SELECT 1"),
+    () =>
+      parseMigrationStatement(
+        "ALTER TABLE events ADD COLUMN x UInt8; SELECT 1"
+      ),
     /exactly one statement/
   );
   assert.throws(
-    () => parseMigrationStatement("ALTER TABLE events -- comment\nADD COLUMN x UInt8"),
+    () =>
+      parseMigrationStatement(
+        "ALTER TABLE events -- comment\nADD COLUMN x UInt8"
+      ),
     /comments are not accepted/
   );
 });

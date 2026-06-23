@@ -30,7 +30,11 @@ export function parseEquivalentArgs(argv: string[]): ParsedEquivalentArgs {
     } else if (arg === "--sample") {
       const value = Number(argv[i + 1]);
       if (!Number.isInteger(value) || value < 1) {
-        return { files, options, error: "--sample requires a positive integer" };
+        return {
+          files,
+          options,
+          error: "--sample requires a positive integer"
+        };
       }
       options.sampleLimit = value;
       i += 1;
@@ -54,7 +58,9 @@ export async function runEquivalentCommand(
     return 2;
   }
   if (files.length !== 2) {
-    console.error("Usage: gozzle equivalent <a.sql> <b.sql> [--sample N] [--json]");
+    console.error(
+      "Usage: gozzle equivalent <a.sql> <b.sql> [--sample N] [--json]"
+    );
     return 2;
   }
 
@@ -78,7 +84,9 @@ export async function runEquivalentCommand(
     );
     return verdictExitCode(result.verdict);
   } catch (runError) {
-    console.error(`gozzle equivalent could not run.\n\n${errorMessage(runError)}`);
+    console.error(
+      `gozzle equivalent could not run.\n\n${errorMessage(runError)}`
+    );
     return 2;
   } finally {
     await client?.close();
@@ -89,4 +97,3 @@ async function readSql(path: string): Promise<string> {
   const raw = await readFile(path, "utf8");
   return stripSqlComments(raw).trim().replace(/;\s*$/, "");
 }
-

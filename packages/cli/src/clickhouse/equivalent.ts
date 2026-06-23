@@ -180,4 +180,3 @@ function clampSampleLimit(value: number | undefined): number {
   }
   return Math.min(Math.floor(value), 50);
 }
-

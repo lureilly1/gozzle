@@ -67,16 +67,12 @@ export function resolvePlaceholders(
         env.CLICKHOUSE_USERNAME
       ) ?? "gozzle_readonly",
     database:
-      firstNonEmpty(
-        env.GOZZLE_CLICKHOUSE_DATABASE,
-        env.CLICKHOUSE_DATABASE
-      ) ?? "default"
+      firstNonEmpty(env.GOZZLE_CLICKHOUSE_DATABASE, env.CLICKHOUSE_DATABASE) ??
+      "default"
   };
 }
 
-function connectionEnv(
-  conn: ConnectionPlaceholders
-): Record<string, string> {
+function connectionEnv(conn: ConnectionPlaceholders): Record<string, string> {
   return {
     GOZZLE_CLICKHOUSE_URL: conn.url,
     GOZZLE_CLICKHOUSE_USER: conn.user,
@@ -90,7 +86,10 @@ function connectionEnv(
  * directly; a project-local install (devDependency) is launched via `npx` so the
  * host resolves the version committed to the repo.
  */
-function serverInvocation(local: boolean): { command: string; args?: string[] } {
+function serverInvocation(local: boolean): {
+  command: string;
+  args?: string[];
+} {
   return local
     ? { command: "npx", args: ["gozzle-mcp"] }
     : { command: "gozzle-mcp" };
@@ -113,7 +112,10 @@ function jsonMcpServers(conn: ConnectionPlaceholders, local: boolean): string {
   );
 }
 
-function buildClaude(conn: ConnectionPlaceholders, local: boolean): HostSnippet {
+function buildClaude(
+  conn: ConnectionPlaceholders,
+  local: boolean
+): HostSnippet {
   const env = connectionEnv(conn);
   const envFlags = Object.entries(env)
     .map(([key, value]) => `--env ${key}="${value}"`)
@@ -129,7 +131,10 @@ function buildClaude(conn: ConnectionPlaceholders, local: boolean): HostSnippet 
   };
 }
 
-function buildCursor(conn: ConnectionPlaceholders, local: boolean): HostSnippet {
+function buildCursor(
+  conn: ConnectionPlaceholders,
+  local: boolean
+): HostSnippet {
   return {
     id: "cursor",
     title: "Cursor",

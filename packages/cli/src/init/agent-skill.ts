@@ -25,7 +25,8 @@ migration — in this project, verify it with gozzle before giving a final answe
 const PLACEMENT: Record<HostId, { title: string; where: string }> = {
   claude: {
     title: "Claude Code",
-    where: "CLAUDE.md in the project root (or ~/.claude/CLAUDE.md for all projects)"
+    where:
+      "CLAUDE.md in the project root (or ~/.claude/CLAUDE.md for all projects)"
   },
   cursor: {
     title: "Cursor",

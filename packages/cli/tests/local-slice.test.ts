@@ -16,7 +16,10 @@ import type {
   ClickHouseExportClient,
   ExportLimits
 } from "../src/clickhouse/client.js";
-import type { LocalEngine, LocalReplayInput } from "../src/local-engine/types.js";
+import type {
+  LocalEngine,
+  LocalReplayInput
+} from "../src/local-engine/types.js";
 import {
   buildLocalCreateStatement,
   createLocalSlice
@@ -180,7 +183,10 @@ test("createLocalSlice writes a manifest when local proof matches source", async
     assert.match(formatted, /Total local slice storage:/);
     assert.match(formatted, /Cleanup: gozzle slices clean slice-/);
     assert.match(formatted, /contains production data/);
-    assert.match(engine.replayInput?.createStatement ?? "", /ReplacingMergeTree\(version\)/);
+    assert.match(
+      engine.replayInput?.createStatement ?? "",
+      /ReplacingMergeTree\(version\)/
+    );
 
     const persisted = JSON.parse(await readFile(result.manifestPath, "utf8"));
     assert.equal(persisted.source.table, "analytics.events");
@@ -225,7 +231,10 @@ test("createLocalSlice refuses a projected aggregate above its storage cap", asy
 
   try {
     await mkdir(join(root, "slice-incomplete"));
-    await writeFile(join(root, "slice-incomplete", "data.parquet"), "x".repeat(100));
+    await writeFile(
+      join(root, "slice-incomplete", "data.parquet"),
+      "x".repeat(100)
+    );
     await assert.rejects(
       createLocalSlice(
         source,

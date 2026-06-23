@@ -43,8 +43,14 @@ test("stripSqlComments handles doubled quotes in literals", () => {
 
 test("detectStatementKind classifies by leading keyword", () => {
   assert.equal(detectStatementKind("SELECT 1"), "query");
-  assert.equal(detectStatementKind("  with x as (select 1) select * from x"), "query");
-  assert.equal(detectStatementKind("ALTER TABLE t ADD COLUMN x UInt8"), "migration");
+  assert.equal(
+    detectStatementKind("  with x as (select 1) select * from x"),
+    "query"
+  );
+  assert.equal(
+    detectStatementKind("ALTER TABLE t ADD COLUMN x UInt8"),
+    "migration"
+  );
   assert.equal(detectStatementKind("INSERT INTO t VALUES (1)"), "unknown");
   assert.equal(detectStatementKind("DROP TABLE t"), "unknown");
 });

@@ -7,7 +7,10 @@ import {
   buildEquivalentStructured,
   formatEquivalentResult
 } from "../src/tools/verify-equivalent.js";
-import { parseEquivalentArgs, runEquivalentCommand } from "../src/commands/equivalent.js";
+import {
+  parseEquivalentArgs,
+  runEquivalentCommand
+} from "../src/commands/equivalent.js";
 import { verdictExitCode } from "../src/shared/verdict.js";
 
 class FakeClient implements ClickHouseMetadataClient {
@@ -65,7 +68,10 @@ test("differing result shape is incorrect and skips the diff", async () => {
   const client = new FakeClient((q) => {
     if (q.includes("DESCRIBE")) {
       return q.includes(", b")
-        ? shape([["a", "UInt64"], ["b", "String"]])
+        ? shape([
+            ["a", "UInt64"],
+            ["b", "String"]
+          ])
         : shape([["a", "UInt64"]]);
     }
     return [];
@@ -76,13 +82,18 @@ test("differing result shape is incorrect and skips the diff", async () => {
   });
   assert.equal(result.verdict, "incorrect");
   assert.ok(result.shapeMismatch);
-  assert.equal(client.queries.some((q) => q.includes("countIf")), false);
+  assert.equal(
+    client.queries.some((q) => q.includes("countIf")),
+    false
+  );
 });
 
 test("identical rows but renamed columns is incorrect (renamed)", async () => {
   const client = new FakeClient((q) => {
     if (q.includes("DESCRIBE"))
-      return q.includes("AS y") ? shape([["y", "UInt64"]]) : shape([["x", "UInt64"]]);
+      return q.includes("AS y")
+        ? shape([["y", "UInt64"]])
+        : shape([["x", "UInt64"]]);
     if (q.includes("countIf")) return [{ left_only: "0", right_only: "0" }];
     return [];
   });
@@ -139,7 +150,10 @@ test("a scan-limit abort maps to indeterminate", async () => {
 test("a non-SELECT side is rejected", async () => {
   const client = new FakeClient(() => []);
   await assert.rejects(
-    verifyEquivalent(client, { left: "DELETE FROM t", right: "SELECT a FROM t" })
+    verifyEquivalent(client, {
+      left: "DELETE FROM t",
+      right: "SELECT a FROM t"
+    })
   );
 });
 
@@ -167,7 +181,16 @@ test("buildEquivalentStructured exposes the contract fields", () => {
 });
 
 test("parseEquivalentArgs needs two files; runEquivalentCommand guards usage", async () => {
-  assert.deepEqual(parseEquivalentArgs(["a.sql", "b.sql"]).files, ["a.sql", "b.sql"]);
-  assert.match(parseEquivalentArgs(["a.sql", "--sample", "x"]).error ?? "", /--sample/);
-  assert.equal(await runEquivalentCommand(["only-one.sql"], {} as NodeJS.ProcessEnv), 2);
+  assert.deepEqual(parseEquivalentArgs(["a.sql", "b.sql"]).files, [
+    "a.sql",
+    "b.sql"
+  ]);
+  assert.match(
+    parseEquivalentArgs(["a.sql", "--sample", "x"]).error ?? "",
+    /--sample/
+  );
+  assert.equal(
+    await runEquivalentCommand(["only-one.sql"], {} as NodeJS.ProcessEnv),
+    2
+  );
 });

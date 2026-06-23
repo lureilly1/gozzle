@@ -42,7 +42,10 @@ test("parseProjectConfig defaults empty sections", () => {
 });
 
 test("parseProjectConfig rejects unknown keys and bad types", () => {
-  assert.throws(() => parseProjectConfig("queries: 'not-an-array'"), /invalid/i);
+  assert.throws(
+    () => parseProjectConfig("queries: 'not-an-array'"),
+    /invalid/i
+  );
   assert.throws(() => parseProjectConfig("typo_key: 1"), /invalid/i);
   assert.throws(
     () => parseProjectConfig("assumptions:\n  events:\n    unique_by: 5"),
@@ -56,10 +59,14 @@ test("globToRegExp handles *, ?, ** and **/", () => {
   assert.ok(!globToRegExp("app/**/*.sql").test("other/x.sql"));
   assert.ok(globToRegExp("dashboards/*.sql").test("dashboards/q.sql"));
   assert.ok(!globToRegExp("dashboards/*.sql").test("dashboards/sub/q.sql"));
-  assert.ok(globToRegExp("migrations/2026_??.sql").test("migrations/2026_07.sql"));
+  assert.ok(
+    globToRegExp("migrations/2026_??.sql").test("migrations/2026_07.sql")
+  );
 });
 
 test("matchesAnyGlob normalizes separators", () => {
   assert.ok(matchesAnyGlob("app\\models\\q.sql", ["app/**/*.sql"]));
-  assert.ok(!matchesAnyGlob("README.md", ["app/**/*.sql", "migrations/**/*.sql"]));
+  assert.ok(
+    !matchesAnyGlob("README.md", ["app/**/*.sql", "migrations/**/*.sql"])
+  );
 });

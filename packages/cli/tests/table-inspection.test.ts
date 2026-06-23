@@ -69,7 +69,10 @@ test("parses and formats table identifiers", () => {
 });
 
 test("extracts ClickHouse DDL clauses", () => {
-  assert.equal(extractClause(createStatement, "ORDER BY"), "(tenant_id, event_id)");
+  assert.equal(
+    extractClause(createStatement, "ORDER BY"),
+    "(tenant_id, event_id)"
+  );
   assert.equal(
     extractClause(createStatement, "PARTITION BY"),
     "toYYYYMM(created_at)"

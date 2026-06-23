@@ -25,10 +25,7 @@ export function readLocalSliceConfig(
   return {
     rootDirectory:
       nonEmpty(env.GOZZLE_SLICE_DIR) ?? join(homedir(), ".gozzle", "slices"),
-    maxRows: positiveInteger(
-      env.GOZZLE_MAX_SLICE_ROWS,
-      DEFAULT_MAX_SLICE_ROWS
-    ),
+    maxRows: positiveInteger(env.GOZZLE_MAX_SLICE_ROWS, DEFAULT_MAX_SLICE_ROWS),
     maxBytes: positiveInteger(
       env.GOZZLE_MAX_SLICE_BYTES,
       DEFAULT_MAX_SLICE_BYTES

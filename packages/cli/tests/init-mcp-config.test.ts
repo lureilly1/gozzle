@@ -53,7 +53,10 @@ test("claude snippet is valid JSON with gozzle-mcp command and a CLI fallback", 
     parsed.mcpServers.gozzle.env.GOZZLE_CLICKHOUSE_PASSWORD,
     "replace-me"
   );
-  assert.match(built.cliCommand ?? "", /^claude mcp add gozzle .*-- gozzle-mcp$/);
+  assert.match(
+    built.cliCommand ?? "",
+    /^claude mcp add gozzle .*-- gozzle-mcp$/
+  );
 });
 
 test("cursor snippet is valid JSON in the mcpServers shape", () => {

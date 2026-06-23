@@ -3,11 +3,7 @@ import { existsSync } from "node:fs";
 import { ClickHouseHttpMetadataClient } from "../clickhouse/client.js";
 import { readClickHouseConfig } from "../config/clickhouse.js";
 import { readProjectConfig } from "../config/project.js";
-import {
-  aggregateExitCode,
-  renderHuman,
-  verifyFiles
-} from "./verify.js";
+import { aggregateExitCode, renderHuman, verifyFiles } from "./verify.js";
 
 /**
  * Pull editable .sql file paths out of a PostToolUse payload. Returns only paths
@@ -20,7 +16,8 @@ export function extractSqlPaths(rawPayload: string): string[] {
   } catch {
     return [];
   }
-  const input = (payload as { tool_input?: Record<string, unknown> })?.tool_input;
+  const input = (payload as { tool_input?: Record<string, unknown> })
+    ?.tool_input;
   if (!input) return [];
 
   const candidates: string[] = [];
