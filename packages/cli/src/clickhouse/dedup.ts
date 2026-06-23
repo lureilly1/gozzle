@@ -1,4 +1,6 @@
 import type { ClickHouseMetadataClient } from "./client.js";
+import { toNumber } from "../shared/num.js";
+import { quoteStringLiteral } from "./identifier.js";
 import {
   formatTableIdentifier,
   type ResolvedTableIdentifier
@@ -280,11 +282,4 @@ async function readLargestPartitions(
   }));
 }
 
-function quoteStringLiteral(value: string): string {
-  return `'${value.replaceAll("\\", "\\\\").replaceAll("'", "\\'")}'`;
-}
 
-function toNumber(value: string | number): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-}

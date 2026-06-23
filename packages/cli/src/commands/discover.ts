@@ -1,4 +1,5 @@
 import { ClickHouseHttpMetadataClient } from "../clickhouse/client.js";
+import { errorMessage } from "../shared/errors.js";
 import { readClickHouseConfig } from "../config/clickhouse.js";
 import {
   discoverWorkload,
@@ -81,7 +82,7 @@ export async function runDiscoverCommand(
     );
     return 0;
   } catch (runError) {
-    console.error(`gozzle discover could not run.\n\n${message(runError)}`);
+    console.error(`gozzle discover could not run.\n\n${errorMessage(runError)}`);
     return 2;
   } finally {
     await client?.close();
@@ -135,6 +136,3 @@ function truncate(text: string, max: number): string {
   return single.length > max ? `${single.slice(0, max - 1)}…` : single;
 }
 
-function message(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}

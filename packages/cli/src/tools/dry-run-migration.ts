@@ -1,5 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { createHash } from "node:crypto";
+import { errorMessage } from "../shared/errors.js";
+import { fingerprint } from "../shared/fingerprint.js";
 import { z } from "zod";
 
 import { ClickHouseHttpMetadataClient } from "../clickhouse/client.js";
@@ -67,7 +68,7 @@ export function createDryRunMigrationTool(server: McpServer): void {
               content: [
                 {
                   type: "text",
-                  text: `gozzle could not dry-run the migration.\n\n${formatErrorMessage(
+                  text: `gozzle could not dry-run the migration.\n\n${errorMessage(
                     error
                   )}`
                 }
@@ -162,10 +163,4 @@ function migrationStatus(classification: string): string {
   return "REVIEW — may rewrite existing data parts";
 }
 
-function formatErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
 
-function fingerprint(statement: string): string {
-  return createHash("sha256").update(statement).digest("hex");
-}

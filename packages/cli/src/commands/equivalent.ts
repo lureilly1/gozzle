@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { errorMessage } from "../shared/errors.js";
 
 import { ClickHouseHttpMetadataClient } from "../clickhouse/client.js";
 import { verifyEquivalent } from "../clickhouse/equivalent.js";
@@ -77,7 +78,7 @@ export async function runEquivalentCommand(
     );
     return verdictExitCode(result.verdict);
   } catch (runError) {
-    console.error(`gozzle equivalent could not run.\n\n${message(runError)}`);
+    console.error(`gozzle equivalent could not run.\n\n${errorMessage(runError)}`);
     return 2;
   } finally {
     await client?.close();
@@ -89,6 +90,3 @@ async function readSql(path: string): Promise<string> {
   return stripSqlComments(raw).trim().replace(/;\s*$/, "");
 }
 
-function message(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}

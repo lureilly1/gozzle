@@ -1,4 +1,5 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { errorMessage } from "../shared/errors.js";
 import { z } from "zod";
 
 import { ClickHouseHttpMetadataClient } from "../clickhouse/client.js";
@@ -57,7 +58,7 @@ export function createLocalSliceTool(server: McpServer): void {
             content: [
               {
                 type: "text",
-                text: `gozzle could not create a local slice.\n\n${formatErrorMessage(
+                text: `gozzle could not create a local slice.\n\n${errorMessage(
                   error
                 )}`
               }
@@ -99,6 +100,3 @@ export function formatLocalSliceResult(result: LocalSliceResult): string {
   return lines.join("\n");
 }
 
-function formatErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}

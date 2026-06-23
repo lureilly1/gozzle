@@ -1,3 +1,10 @@
+import {
+  escapeRegExp,
+  findTopLevelKeyword,
+  findTopLevelWords,
+  maskQuoted
+} from "./sql-scan.js";
+
 export interface ValidatedQuery {
   query: string;
   hasFinal: boolean;
@@ -39,7 +46,7 @@ const EXTERNAL_TABLE_FUNCTIONS = [
 
 export function validateDiagnosticQuery(input: string): ValidatedQuery {
   const query = normalizeSingleQuery(input);
-  const structuralQuery = maskQuotedContent(query);
+  const structuralQuery = maskQuoted(query);
   const upper = structuralQuery.toUpperCase();
   const startsWithSelect = /^SELECT\b/i.test(query);
   const startsWithWith = /^WITH\b/i.test(query);
@@ -111,99 +118,4 @@ function normalizeSingleQuery(input: string): string {
     throw new Error("diagnose_query accepts exactly one query.");
   }
   return normalized;
-}
-
-function findTopLevelWords(input: string, words: string): number {
-  const pattern = new RegExp(
-    `^${words
-      .split(/\s+/)
-      .map((word) => escapeRegExp(word))
-      .join("\\s+")}(?![A-Za-z0-9_])`,
-    "i"
-  );
-  return scanTopLevel(input, (_character, index) => {
-    const before = index === 0 ? " " : input[index - 1];
-    return !/[A-Za-z0-9_]/.test(before) && pattern.test(input.slice(index));
-  });
-}
-
-function findTopLevelKeyword(input: string, keyword: string): number {
-  return scanTopLevel(input, (_character, index) => {
-    const before = index === 0 ? " " : input[index - 1];
-    const after = input[index + keyword.length] ?? " ";
-    return (
-      input.slice(index, index + keyword.length).toUpperCase() === keyword &&
-      !/[A-Za-z0-9_]/.test(before) &&
-      !/[A-Za-z0-9_]/.test(after)
-    );
-  });
-}
-
-function scanTopLevel(
-  input: string,
-  matches: (character: string, index: number) => boolean
-): number {
-  let depth = 0;
-  let quote: "'" | '"' | "`" | undefined;
-  for (let index = 0; index < input.length; index += 1) {
-    const character = input[index];
-    if (quote) {
-      if (character === "\\") index += 1;
-      else if (character === quote) {
-        if (input[index + 1] === quote) index += 1;
-        else quote = undefined;
-      }
-      continue;
-    }
-    if (character === "'" || character === '"' || character === "`") {
-      quote = character;
-      continue;
-    }
-    if (character === "(") {
-      depth += 1;
-      continue;
-    }
-    if (character === ")") {
-      depth = Math.max(0, depth - 1);
-      continue;
-    }
-    if (depth !== 0) continue;
-
-    if (matches(character, index)) return index;
-  }
-  return -1;
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function maskQuotedContent(input: string): string {
-  const characters = [...input];
-  let quote: "'" | '"' | "`" | undefined;
-  for (let index = 0; index < characters.length; index += 1) {
-    const character = characters[index];
-    if (quote) {
-      characters[index] = " ";
-      if (character === "\\") {
-        if (index + 1 < characters.length) {
-          characters[index + 1] = " ";
-          index += 1;
-        }
-      } else if (character === quote) {
-        if (input[index + 1] === quote) {
-          characters[index + 1] = " ";
-          index += 1;
-        } else {
-          quote = undefined;
-        }
-      }
-      continue;
-    }
-    if (character === "'" || character === '"' || character === "`") {
-      quote = character;
-      characters[index] = " ";
-    }
-  }
-  return characters.join("");
 }

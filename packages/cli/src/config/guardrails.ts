@@ -1,3 +1,5 @@
+import { readBoolean, readNonNegativeInt } from "./env.js";
+
 export interface GuardrailConfig {
   /** Enforce a read-only session (readonly=2) so no query can write. */
   enforceReadonly: boolean;
@@ -91,37 +93,4 @@ export function toClickHouseSettings(
   return settings;
 }
 
-function readBoolean(value: string | undefined, fallback: boolean): boolean {
-  if (value === undefined || value.trim() === "") {
-    return fallback;
-  }
 
-  const normalized = value.trim().toLowerCase();
-
-  if (["1", "true", "yes", "on"].includes(normalized)) {
-    return true;
-  }
-
-  if (["0", "false", "no", "off"].includes(normalized)) {
-    return false;
-  }
-
-  return fallback;
-}
-
-function readNonNegativeInt(
-  value: string | undefined,
-  fallback: number
-): number {
-  if (value === undefined || value.trim() === "") {
-    return fallback;
-  }
-
-  const parsed = Number(value);
-
-  if (!Number.isFinite(parsed) || parsed < 0) {
-    return fallback;
-  }
-
-  return Math.floor(parsed);
-}

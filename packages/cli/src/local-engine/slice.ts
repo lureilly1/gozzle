@@ -1,4 +1,6 @@
 import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { toNumber } from "../shared/num.js";
+import { quoteStringLiteral } from "../clickhouse/identifier.js";
 import { basename, join } from "node:path";
 
 import type {
@@ -341,11 +343,4 @@ function proofsMatch(source: VerifyDedupResult, local: VerifyDedupResult): boole
   );
 }
 
-function quoteStringLiteral(value: string): string {
-  return `'${value.replaceAll("\\", "\\\\").replaceAll("'", "\\'")}'`;
-}
 
-function toNumber(value: string | number): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-}

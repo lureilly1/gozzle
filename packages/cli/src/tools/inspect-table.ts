@@ -1,4 +1,5 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { errorMessage } from "../shared/errors.js";
 import { z } from "zod";
 
 import { ClickHouseHttpMetadataClient } from "../clickhouse/client.js";
@@ -46,7 +47,7 @@ export function createInspectTableTool(server: McpServer): void {
             content: [
               {
                 type: "text",
-                text: `gozzle could not inspect the table.\n\n${formatErrorMessage(
+                text: `gozzle could not inspect the table.\n\n${errorMessage(
                   error
                 )}`
               }
@@ -98,6 +99,3 @@ export function formatTableInspection(inspection: TableInspection): string {
   return lines.join("\n");
 }
 
-function formatErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}

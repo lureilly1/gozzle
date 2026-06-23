@@ -1,4 +1,6 @@
 import type { ClickHouseMetadataClient } from "./client.js";
+import { toNumber } from "../shared/num.js";
+import { quoteStringLiteral } from "./identifier.js";
 
 export interface WorkloadQuery {
   hash: string;
@@ -145,11 +147,4 @@ function clampInt(value: number | undefined, fallback: number): number {
   return Math.floor(value);
 }
 
-function toNumber(value: string | number): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
 
-function quoteStringLiteral(value: string): string {
-  return `'${value.replaceAll("\\", "\\\\").replaceAll("'", "\\'")}'`;
-}

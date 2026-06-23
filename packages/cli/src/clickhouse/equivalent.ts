@@ -1,4 +1,5 @@
 import type { ClickHouseMetadataClient } from "./client.js";
+import { toNumber } from "../shared/num.js";
 import { validateDiagnosticQuery } from "./query-validator.js";
 import type { Verdict } from "../shared/verdict.js";
 
@@ -180,7 +181,3 @@ function clampSampleLimit(value: number | undefined): number {
   return Math.min(Math.floor(value), 50);
 }
 
-function toNumber(value: string | number): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-}

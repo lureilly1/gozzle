@@ -1,7 +1,9 @@
-import { createHash } from "node:crypto";
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+
+import { errorMessage } from "../shared/errors.js";
+import { fingerprint } from "../shared/fingerprint.js";
 
 import { ClickHouseHttpMetadataClient } from "../clickhouse/client.js";
 import {
@@ -63,7 +65,7 @@ export function createVerifyEquivalentTool(server: McpServer): void {
               content: [
                 {
                   type: "text",
-                  text: `gozzle could not verify equivalence.\n\n${formatErrorMessage(
+                  text: `gozzle could not verify equivalence.\n\n${errorMessage(
                     error
                   )}`
                 }
@@ -157,10 +159,4 @@ function formatValue(value: unknown): string {
   return typeof value === "string" ? value : JSON.stringify(value);
 }
 
-function fingerprint(query: string): string {
-  return createHash("sha256").update(query).digest("hex");
-}
 
-function formatErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}

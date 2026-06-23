@@ -1,4 +1,6 @@
 import type { ClickHouseMetadataClient } from "./client.js";
+import { toNumber } from "../shared/num.js";
+import { quoteStringLiteral } from "./identifier.js";
 import {
   formatTableIdentifier,
   parseTableIdentifier,
@@ -292,11 +294,4 @@ function normalizeOptional(value: string | undefined): string | undefined {
   return value && value.trim() !== "" ? value : undefined;
 }
 
-function toNumber(value: string | number): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
 
-function quoteStringLiteral(value: string): string {
-  return `'${value.replaceAll("\\", "\\\\").replaceAll("'", "\\'")}'`;
-}

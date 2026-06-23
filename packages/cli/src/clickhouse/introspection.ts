@@ -1,4 +1,5 @@
 import type { ClickHouseConnectionConfig } from "../config/clickhouse.js";
+import { errorMessage } from "../shared/errors.js";
 import {
   DEFAULT_GUARDRAILS,
   type GuardrailConfig
@@ -125,7 +126,7 @@ async function readReadonlySetting(
     return row ? String(row.value) : undefined;
   } catch (error) {
     warnings.push(
-      `Could not inspect readonly setting: ${formatErrorMessage(error)}`
+      `Could not inspect readonly setting: ${errorMessage(error)}`
     );
     return undefined;
   }
@@ -151,12 +152,9 @@ async function readWritePrivileges(
       .map((row) => row.access_type)
       .filter((accessType) => WRITE_PRIVILEGES.has(accessType));
   } catch (error) {
-    warnings.push(`Could not inspect grants: ${formatErrorMessage(error)}`);
+    warnings.push(`Could not inspect grants: ${errorMessage(error)}`);
     return [];
   }
 }
 
-function formatErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
 

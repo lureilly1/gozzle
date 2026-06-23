@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { quoteStringLiteral } from "../clickhouse/identifier.js";
 
 import type { Session } from "chdb";
 
@@ -86,6 +87,3 @@ function stripTrailingSemicolon(query: string): string {
   return query.trim().replace(/;$/, "");
 }
 
-function quoteStringLiteral(value: string): string {
-  return `'${value.replaceAll("\\", "\\\\").replaceAll("'", "\\'")}'`;
-}

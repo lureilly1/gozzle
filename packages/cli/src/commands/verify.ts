@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { errorMessage } from "../shared/errors.js";
 import { existsSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import { dirname, join, relative, sep } from "node:path";
@@ -147,7 +148,7 @@ async function verifyFile(
   try {
     raw = await readFile(file, "utf8");
   } catch (error) {
-    const outcome = operationalError(file, `could not read file: ${message(error)}`);
+    const outcome = operationalError(file, `could not read file: ${errorMessage(error)}`);
     await audit(env, file, "error", start);
     return outcome;
   }
@@ -222,7 +223,7 @@ async function verifyFile(
     await audit(env, file, "error", start);
     return outcome;
   } catch (error) {
-    const outcome = operationalError(file, message(error));
+    const outcome = operationalError(file, errorMessage(error));
     await audit(env, file, "error", start);
     return outcome;
   }
@@ -280,7 +281,7 @@ export async function runVerifyCommand(
   try {
     loaded = await readProjectConfig();
   } catch (configError) {
-    console.error(message(configError));
+    console.error(errorMessage(configError));
     return 2;
   }
   const project = loaded?.config;
@@ -303,7 +304,7 @@ export async function runVerifyCommand(
       targetFiles = await resolveGitFiles(options, project);
     } catch (gitError) {
       console.error(
-        `gozzle verify could not resolve changed files.\n\n${message(gitError)}`
+        `gozzle verify could not resolve changed files.\n\n${errorMessage(gitError)}`
       );
       return 2;
     }
@@ -333,7 +334,7 @@ export async function runVerifyCommand(
     console.log(options.json ? renderJson(outcomes) : renderHuman(outcomes));
     return aggregateExitCode(outcomes);
   } catch (runError) {
-    console.error(`gozzle verify could not run.\n\n${message(runError)}`);
+    console.error(`gozzle verify could not run.\n\n${errorMessage(runError)}`);
     return 2;
   } finally {
     await client?.close();
@@ -507,6 +508,3 @@ async function audit(
   );
 }
 
-function message(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}

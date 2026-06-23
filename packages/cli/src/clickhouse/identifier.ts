@@ -51,6 +51,11 @@ export function quoteIdentifier(identifier: string): string {
   return `\`${identifier.replaceAll("`", "``")}\``;
 }
 
+/** Quote a value as a ClickHouse string literal, escaping backslashes and quotes. */
+export function quoteStringLiteral(value: string): string {
+  return `'${value.replaceAll("\\", "\\\\").replaceAll("'", "\\'")}'`;
+}
+
 export function formatTableIdentifier(identifier: ResolvedTableIdentifier): string {
   return `${quoteIdentifier(identifier.database)}.${quoteIdentifier(identifier.table)}`;
 }

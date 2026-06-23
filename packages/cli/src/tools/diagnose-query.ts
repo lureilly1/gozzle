@@ -1,7 +1,8 @@
-import { createHash } from "node:crypto";
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+
+import { fingerprint } from "../shared/fingerprint.js";
 
 import { ClickHouseHttpMetadataClient } from "../clickhouse/client.js";
 import {
@@ -172,9 +173,6 @@ function appendFindings(
   }
 }
 
-function fingerprint(query: string): string {
-  return createHash("sha256").update(query).digest("hex");
-}
 
 function formatDiagnosticError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);

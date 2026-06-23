@@ -10,6 +10,7 @@ import { runDiscoverCommand } from "./commands/discover.js";
 import { runEquivalentCommand } from "./commands/equivalent.js";
 import { runHookRun } from "./commands/hook.js";
 import { renderHookRecipe } from "./init/hook-recipe.js";
+import { formatBytes } from "./shared/format.js";
 
 const metadata = readPackageMetadata();
 const command = process.argv[2] ?? "help";
@@ -159,11 +160,6 @@ function slicesUsage(): string {
   return "Usage: gozzle slices [list] | clean <slice-id> [...] | clean --all | clean --older-than 7d | clean --invalid [slice-id ...]";
 }
 
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KiB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MiB`;
-}
 
 function fail(message: string): never {
   console.error(message);

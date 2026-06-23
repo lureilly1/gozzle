@@ -1,4 +1,11 @@
 import { parseTableIdentifier, type TableIdentifier } from "./identifier.js";
+import {
+  escapeRegExp,
+  findTopLevelKeyword,
+  findTopLevelWords,
+  maskQuoted,
+  scanTopLevel
+} from "./sql-scan.js";
 
 export type MigrationClassification =
   | "metadata-only"
@@ -292,32 +299,6 @@ function hasTopLevelComma(input: string): boolean {
   return scanTopLevel(input, (character) => character === ",") !== -1;
 }
 
-function findTopLevelKeyword(input: string, keyword: string): number {
-  return scanTopLevel(input, (_character, index) => {
-    const before = index === 0 ? " " : input[index - 1];
-    const after = input[index + keyword.length] ?? " ";
-    return (
-      input.slice(index, index + keyword.length).toUpperCase() === keyword &&
-      !/[A-Za-z0-9_]/.test(before) &&
-      !/[A-Za-z0-9_]/.test(after)
-    );
-  });
-}
-
-function findTopLevelWords(input: string, words: string): number {
-  const pattern = new RegExp(
-    `^${words
-      .split(/\s+/)
-      .map((word) => escapeRegExp(word))
-      .join("\\s+")}(?![A-Za-z0-9_])`,
-    "i"
-  );
-  return scanTopLevel(input, (_character, index) => {
-    const before = index === 0 ? " " : input[index - 1];
-    return !/[A-Za-z0-9_]/.test(before) && pattern.test(input.slice(index));
-  });
-}
-
 function findSettingsClause(input: string): number {
   const index = findTopLevelKeyword(input, "SETTINGS");
   if (index <= 0) return -1;
@@ -338,67 +319,3 @@ function findExternalAccessFunction(input: string): string | undefined {
   return match?.[1];
 }
 
-function maskQuoted(input: string): string {
-  const characters = [...input];
-  let quote: "'" | '"' | "`" | undefined;
-  for (let index = 0; index < characters.length; index += 1) {
-    const character = characters[index];
-    if (quote) {
-      characters[index] = " ";
-      if (character === "\\") {
-        index += 1;
-        if (index < characters.length) characters[index] = " ";
-      } else if (character === quote) {
-        if (characters[index + 1] === quote) {
-          index += 1;
-          characters[index] = " ";
-        } else {
-          quote = undefined;
-        }
-      }
-      continue;
-    }
-    if (character === "'" || character === '"' || character === "`") {
-      quote = character;
-      characters[index] = " ";
-    }
-  }
-  return characters.join("");
-}
-
-function scanTopLevel(
-  input: string,
-  matches: (character: string, index: number) => boolean
-): number {
-  let depth = 0;
-  let quote: "'" | '"' | "`" | undefined;
-  for (let index = 0; index < input.length; index += 1) {
-    const character = input[index];
-    if (quote) {
-      if (character === "\\") index += 1;
-      else if (character === quote) {
-        if (input[index + 1] === quote) index += 1;
-        else quote = undefined;
-      }
-      continue;
-    }
-    if (character === "'" || character === '"' || character === "`") {
-      quote = character;
-      continue;
-    }
-    if (character === "(") {
-      depth += 1;
-      continue;
-    }
-    if (character === ")") {
-      depth = Math.max(0, depth - 1);
-      continue;
-    }
-    if (depth === 0 && matches(character, index)) return index;
-  }
-  return -1;
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}

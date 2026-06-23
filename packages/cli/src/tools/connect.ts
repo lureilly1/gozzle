@@ -1,4 +1,5 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { errorMessage } from "../shared/errors.js";
 
 import { ClickHouseHttpMetadataClient } from "../clickhouse/client.js";
 import { inspectClickHouseConnection } from "../clickhouse/introspection.js";
@@ -43,7 +44,7 @@ export function createConnectTool(server: McpServer): void {
             content: [
               {
                 type: "text",
-                text: `gozzle could not connect to ClickHouse.\n\n${formatErrorMessage(
+                text: `gozzle could not connect to ClickHouse.\n\n${errorMessage(
                   error
                 )}`
               }
@@ -84,7 +85,4 @@ function formatConnectionInfo(info: ConnectionInfo): string {
   return lines.join("\n");
 }
 
-function formatErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
 

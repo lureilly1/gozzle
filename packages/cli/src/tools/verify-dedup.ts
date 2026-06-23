@@ -1,4 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { errorMessage } from "../shared/errors.js";
+import { readNonNegativeInt } from "../config/env.js";
 import { z } from "zod";
 
 import { ClickHouseHttpMetadataClient } from "../clickhouse/client.js";
@@ -228,19 +230,9 @@ export function readDedupScanGuard(
   };
 }
 
-function readNonNegativeInt(
-  value: string | undefined,
-  fallback: number
-): number {
-  if (value === undefined || value.trim() === "") {
-    return fallback;
-  }
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : fallback;
-}
 
 function formatDedupError(error: unknown): string {
-  const message = formatErrorMessage(error);
+  const message = errorMessage(error);
   const base = `gozzle could not verify deduplication.\n\n${message}`;
   // A read-limit or timeout abort means the table is too big for a single-pass
   // proof; steer the caller to the cheaper, scoped path.
@@ -250,6 +242,3 @@ function formatDedupError(error: unknown): string {
   return base;
 }
 
-function formatErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
