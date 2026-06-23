@@ -4,6 +4,7 @@ import { readNonNegativeInt } from "../config/env.js";
 import { z } from "zod";
 
 import { verifyDedup, type VerifyDedupResult } from "../clickhouse/dedup.js";
+import { formatValue } from "../shared/format.js";
 import { runAuditedTool } from "../shared/audit.js";
 import { withClickHouseTool } from "./with-clickhouse.js";
 
@@ -174,14 +175,6 @@ export function formatDedupResult(result: VerifyDedupResult): string {
   }
 
   return lines.join("\n");
-}
-
-function formatValue(value: unknown): string {
-  if (value === null || value === undefined) {
-    return "NULL";
-  }
-
-  return typeof value === "string" ? value : JSON.stringify(value);
 }
 
 const DEFAULT_MAX_SCAN_ROWS = 200_000_000;

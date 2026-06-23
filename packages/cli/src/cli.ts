@@ -13,74 +13,112 @@ import { renderHookRecipe } from "./init/hook-recipe.js";
 import { formatBytes } from "./shared/format.js";
 
 const metadata = readPackageMetadata();
-const command = process.argv[2] ?? "help";
 
-if (command === "version" || command === "--version" || command === "-v") {
-  console.log(metadata.version);
-  process.exit(0);
+interface Command {
+  /** Left column in the help listing, after "gozzle ". */
+  usage: string;
+  summary: string;
+  /** Returns the process exit code. */
+  run: (args: string[]) => Promise<number> | number;
 }
 
-if (command === "init") {
-  const args = process.argv.slice(3);
-  const local = args.includes("--local");
-  const host = args.find((arg) => !arg.startsWith("--"));
-  if (host !== undefined && !isHostId(host)) {
-    fail("Usage: gozzle init [claude|cursor|codex] [--local]");
+const commands: Record<string, Command> = {
+  verify: {
+    usage: "verify",
+    summary:
+      "Verify SQL files | --changed | --diff <range> | --all (exit 1 on findings)",
+    run: (args) => runVerifyCommand(args)
+  },
+  discover: {
+    usage: "discover",
+    summary: "Rank recent SELECTs from system.query_log (--since 7d, --limit N)",
+    run: (args) => runDiscoverCommand(args)
+  },
+  equivalent: {
+    usage: "equivalent <a.sql> <b.sql>",
+    summary: "Prove two queries return the same result",
+    run: (args) => runEquivalentCommand(args)
+  },
+  init: {
+    usage: "init [host]",
+    summary:
+      "Print MCP config (host: claude, cursor, codex; --local for project install)",
+    run: (args) => {
+      const local = args.includes("--local");
+      const host = args.find((arg) => !arg.startsWith("--"));
+      if (host !== undefined && !isHostId(host)) {
+        fail("Usage: gozzle init [claude|cursor|codex] [--local]");
+      }
+      console.log(renderInit(host, undefined, local));
+      return 0;
+    }
+  },
+  skill: {
+    usage: "skill [host]",
+    summary: "Print the agent instruction to auto-verify ClickHouse changes",
+    run: (args) => {
+      const host = args[0];
+      if (host !== undefined && !isHostId(host)) {
+        fail("Usage: gozzle skill [claude|cursor|codex]");
+      }
+      console.log(renderSkill(host));
+      return 0;
+    }
+  },
+  hook: {
+    usage: "hook",
+    summary: "Print the PostToolUse hook recipe (gozzle hook run = the runtime)",
+    run: (args) => {
+      if (args[0] === "run") return runHookRun();
+      console.log(renderHookRecipe(args.includes("--local")));
+      return 0;
+    }
+  },
+  slices: {
+    usage: "slices",
+    summary: "List and clean local slice workspaces",
+    run: async (args) => {
+      await runSlicesCommand(args);
+      return 0;
+    }
+  },
+  version: {
+    usage: "version",
+    summary: "Print the CLI version",
+    run: () => {
+      console.log(metadata.version);
+      return 0;
+    }
   }
-  console.log(renderInit(host, undefined, local));
-  process.exit(0);
+};
+
+const VERSION_ALIASES = new Set(["version", "--version", "-v"]);
+const HELP_ALIASES = new Set(["help", "--help", "-h"]);
+
+const requested = process.argv[2] ?? "help";
+const name = VERSION_ALIASES.has(requested) ? "version" : requested;
+const command = commands[name];
+
+if (command && !HELP_ALIASES.has(requested)) {
+  process.exit(await command.run(process.argv.slice(3)));
 }
 
-if (command === "skill") {
-  const host = process.argv[3];
-  if (host !== undefined && !isHostId(host)) {
-    fail("Usage: gozzle skill [claude|cursor|codex]");
+printHelp();
+process.exit(HELP_ALIASES.has(requested) || requested === "help" ? 0 : 1);
+
+function printHelp(): void {
+  const width = Math.max(
+    ...Object.values(commands).map((c) => c.usage.length),
+    "gozzle-mcp".length - "gozzle ".length
+  );
+  console.log(`gozzle ${metadata.version}`);
+  console.log("");
+  console.log("Commands:");
+  for (const c of Object.values(commands)) {
+    console.log(`  gozzle ${c.usage.padEnd(width)}  ${c.summary}`);
   }
-  console.log(renderSkill(host));
-  process.exit(0);
+  console.log(`  ${"gozzle-mcp".padEnd(width + "gozzle ".length)}  Start the MCP stdio server`);
 }
-
-if (command === "verify") {
-  const code = await runVerifyCommand(process.argv.slice(3));
-  process.exit(code);
-}
-
-if (command === "discover") {
-  const code = await runDiscoverCommand(process.argv.slice(3));
-  process.exit(code);
-}
-
-if (command === "equivalent") {
-  const code = await runEquivalentCommand(process.argv.slice(3));
-  process.exit(code);
-}
-
-if (command === "hook") {
-  if (process.argv[3] === "run") {
-    const code = await runHookRun();
-    process.exit(code);
-  }
-  console.log(renderHookRecipe(process.argv.includes("--local")));
-  process.exit(0);
-}
-
-if (command === "slices") {
-  await runSlicesCommand(process.argv.slice(3));
-  process.exit(0);
-}
-
-console.log(`gozzle ${metadata.version}`);
-console.log("");
-console.log("Commands:");
-console.log("  gozzle verify        Verify SQL files | --changed | --diff <range> | --all (exit 1 on findings)");
-console.log("  gozzle discover      Rank recent SELECTs from system.query_log (--since 7d, --limit N)");
-console.log("  gozzle equivalent <a.sql> <b.sql>  Prove two queries return the same result");
-console.log("  gozzle init [host] Print MCP config (host: claude, cursor, codex; --local for project install)");
-console.log("  gozzle skill [host] Print the agent instruction to auto-verify ClickHouse changes");
-console.log("  gozzle hook        Print the PostToolUse hook recipe (gozzle hook run = the runtime)");
-console.log("  gozzle slices      List and clean local slice workspaces");
-console.log("  gozzle version     Print the CLI version");
-console.log("  gozzle-mcp         Start the MCP stdio server");
 
 async function runSlicesCommand(args: string[]): Promise<void> {
   const action = args[0] ?? "list";
@@ -159,7 +197,6 @@ function cleanOptions(targets: string[]) {
 function slicesUsage(): string {
   return "Usage: gozzle slices [list] | clean <slice-id> [...] | clean --all | clean --older-than 7d | clean --invalid [slice-id ...]";
 }
-
 
 function fail(message: string): never {
   console.error(message);

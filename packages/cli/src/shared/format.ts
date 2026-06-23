@@ -16,3 +16,9 @@ export function formatBytes(bytes: number): string {
 export function formatCount(value: number): string {
   return Number.isFinite(value) ? value.toLocaleString("en-US") : String(value);
 }
+
+/** Render a ClickHouse cell value for human-readable key samples. */
+export function formatValue(value: unknown): string {
+  if (value === null || value === undefined) return "NULL";
+  return typeof value === "string" ? value : JSON.stringify(value);
+}

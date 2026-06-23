@@ -9,6 +9,7 @@ import {
   verifyEquivalent,
   type VerifyEquivalentResult
 } from "../clickhouse/equivalent.js";
+import { formatValue } from "../shared/format.js";
 import { runAuditedTool } from "../shared/audit.js";
 import { withClickHouseTool } from "./with-clickhouse.js";
 
@@ -141,9 +142,5 @@ function formatShape(shape: { name: string; type: string }[]): string {
   return shape.map((column) => `${column.name}:${column.type}`).join(", ");
 }
 
-function formatValue(value: unknown): string {
-  if (value === null || value === undefined) return "NULL";
-  return typeof value === "string" ? value : JSON.stringify(value);
-}
 
 
