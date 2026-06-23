@@ -5,13 +5,12 @@ import { z } from "zod";
 import { errorMessage } from "../shared/errors.js";
 import { fingerprint } from "../shared/fingerprint.js";
 
-import { ClickHouseHttpMetadataClient } from "../clickhouse/client.js";
 import {
   verifyEquivalent,
   type VerifyEquivalentResult
 } from "../clickhouse/equivalent.js";
-import { readClickHouseConfig } from "../config/clickhouse.js";
 import { runAuditedTool } from "../shared/audit.js";
+import { withClickHouseTool } from "./with-clickhouse.js";
 
 export function createVerifyEquivalentTool(server: McpServer): void {
   server.registerTool(
@@ -45,36 +44,24 @@ export function createVerifyEquivalentTool(server: McpServer): void {
       runAuditedTool(
         "verify_equivalent",
         { leftSha256: fingerprint(left), rightSha256: fingerprint(right) },
-        async () => {
-          let client: ClickHouseHttpMetadataClient | undefined;
-          try {
-            const config = readClickHouseConfig();
-            client = new ClickHouseHttpMetadataClient(config);
-            const result = await verifyEquivalent(client, {
-              left,
-              right,
-              sampleLimit
-            });
-            return {
-              content: [{ type: "text", text: formatEquivalentResult(result) }],
-              structuredContent: buildEquivalentStructured(result)
-            };
-          } catch (error) {
-            return {
-              isError: true,
-              content: [
-                {
-                  type: "text",
-                  text: `gozzle could not verify equivalence.\n\n${errorMessage(
-                    error
-                  )}`
-                }
-              ]
-            };
-          } finally {
-            await client?.close();
-          }
-        }
+        () =>
+          withClickHouseTool(
+            async (client) => {
+              const result = await verifyEquivalent(client, {
+                left,
+                right,
+                sampleLimit
+              });
+              return {
+                content: [
+                  { type: "text", text: formatEquivalentResult(result) }
+                ],
+                structuredContent: buildEquivalentStructured(result)
+              };
+            },
+            (error) =>
+              `gozzle could not verify equivalence.\n\n${errorMessage(error)}`
+          )
       )
   );
 }

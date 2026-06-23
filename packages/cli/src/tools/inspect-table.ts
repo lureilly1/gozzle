@@ -2,10 +2,9 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorMessage } from "../shared/errors.js";
 import { z } from "zod";
 
-import { ClickHouseHttpMetadataClient } from "../clickhouse/client.js";
 import { inspectTable, type TableInspection } from "../clickhouse/table-inspection.js";
-import { readClickHouseConfig } from "../config/clickhouse.js";
 import { runAuditedTool } from "../shared/audit.js";
+import { withClickHouseTool } from "./with-clickhouse.js";
 
 export function createInspectTableTool(server: McpServer): void {
   server.registerTool(
@@ -22,41 +21,20 @@ export function createInspectTableTool(server: McpServer): void {
       }
     },
     async ({ table }) =>
-      runAuditedTool("inspect_table", { table }, async () => {
-        let client: ClickHouseHttpMetadataClient | undefined;
-
-        try {
-          const config = readClickHouseConfig();
-          client = new ClickHouseHttpMetadataClient(config);
-          const inspection = await inspectTable(client, {
-            table,
-            defaultDatabase: config.database ?? "default"
-          });
-
-          return {
-            content: [
-              {
-                type: "text",
-                text: formatTableInspection(inspection)
-              }
-            ]
-          };
-        } catch (error) {
-          return {
-            isError: true,
-            content: [
-              {
-                type: "text",
-                text: `gozzle could not inspect the table.\n\n${errorMessage(
-                  error
-                )}`
-              }
-            ]
-          };
-        } finally {
-          await client?.close();
-        }
-      })
+      runAuditedTool("inspect_table", { table }, () =>
+        withClickHouseTool(
+          async (client, config) => {
+            const inspection = await inspectTable(client, {
+              table,
+              defaultDatabase: config.database ?? "default"
+            });
+            return {
+              content: [{ type: "text", text: formatTableInspection(inspection) }]
+            };
+          },
+          (error) => `gozzle could not inspect the table.\n\n${errorMessage(error)}`
+        )
+      )
   );
 }
 

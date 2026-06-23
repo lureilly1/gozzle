@@ -3,14 +3,13 @@ import { errorMessage } from "../shared/errors.js";
 import { fingerprint } from "../shared/fingerprint.js";
 import { z } from "zod";
 
-import { ClickHouseHttpMetadataClient } from "../clickhouse/client.js";
 import {
   dryRunMigration,
   type DryRunMigrationResult
 } from "../clickhouse/migration.js";
-import { readClickHouseConfig } from "../config/clickhouse.js";
 import { formatBytes, formatCount } from "../shared/format.js";
 import { runAuditedTool } from "../shared/audit.js";
+import { withClickHouseTool } from "./with-clickhouse.js";
 
 export function createDryRunMigrationTool(server: McpServer): void {
   server.registerTool(
@@ -49,35 +48,21 @@ export function createDryRunMigrationTool(server: McpServer): void {
       runAuditedTool(
         "dry_run_migration",
         { statementSha256: fingerprint(statement) },
-        async () => {
-          let client: ClickHouseHttpMetadataClient | undefined;
-          try {
-            const config = readClickHouseConfig();
-            client = new ClickHouseHttpMetadataClient(config);
-            const result = await dryRunMigration(client, {
-              statement,
-              defaultDatabase: config.database ?? "default"
-            });
-            return {
-              content: [{ type: "text", text: formatMigrationResult(result) }],
-              structuredContent: buildMigrationStructured(result)
-            };
-          } catch (error) {
-            return {
-              isError: true,
-              content: [
-                {
-                  type: "text",
-                  text: `gozzle could not dry-run the migration.\n\n${errorMessage(
-                    error
-                  )}`
-                }
-              ]
-            };
-          } finally {
-            await client?.close();
-          }
-        }
+        () =>
+          withClickHouseTool(
+            async (client, config) => {
+              const result = await dryRunMigration(client, {
+                statement,
+                defaultDatabase: config.database ?? "default"
+              });
+              return {
+                content: [{ type: "text", text: formatMigrationResult(result) }],
+                structuredContent: buildMigrationStructured(result)
+              };
+            },
+            (error) =>
+              `gozzle could not dry-run the migration.\n\n${errorMessage(error)}`
+          )
       )
   );
 }

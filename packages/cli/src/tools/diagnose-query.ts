@@ -4,14 +4,13 @@ import { z } from "zod";
 
 import { fingerprint } from "../shared/fingerprint.js";
 
-import { ClickHouseHttpMetadataClient } from "../clickhouse/client.js";
 import {
   diagnoseQuery,
   type DiagnoseQueryResult,
   type QueryFinding
 } from "../clickhouse/query-diagnosis.js";
-import { readClickHouseConfig } from "../config/clickhouse.js";
 import { runAuditedTool } from "../shared/audit.js";
+import { withClickHouseTool } from "./with-clickhouse.js";
 
 export function createDiagnoseQueryTool(server: McpServer): void {
   server.registerTool(
@@ -53,32 +52,24 @@ export function createDiagnoseQueryTool(server: McpServer): void {
       runAuditedTool(
         "diagnose_query",
         { querySha256: fingerprint(query) },
-        async () => {
-          let client: ClickHouseHttpMetadataClient | undefined;
-          try {
-            const config = readClickHouseConfig();
-            client = new ClickHouseHttpMetadataClient(config);
-            const result = await diagnoseQuery(client, query, config.database ?? "default");
-            return {
-              content: [{ type: "text", text: formatQueryDiagnosis(result) }],
-              structuredContent: buildDiagnosisStructured(result)
-            };
-          } catch (error) {
-            return {
-              isError: true,
-              content: [
-                {
-                  type: "text",
-                  text: `gozzle could not diagnose the query.\n\nQuery fingerprint: ${fingerprint(
-                    query
-                  )}\n${formatDiagnosticError(error)}`
-                }
-              ]
-            };
-          } finally {
-            await client?.close();
-          }
-        }
+        () =>
+          withClickHouseTool(
+            async (client, config) => {
+              const result = await diagnoseQuery(
+                client,
+                query,
+                config.database ?? "default"
+              );
+              return {
+                content: [{ type: "text", text: formatQueryDiagnosis(result) }],
+                structuredContent: buildDiagnosisStructured(result)
+              };
+            },
+            (error) =>
+              `gozzle could not diagnose the query.\n\nQuery fingerprint: ${fingerprint(
+                query
+              )}\n${formatDiagnosticError(error)}`
+          )
       )
   );
 }

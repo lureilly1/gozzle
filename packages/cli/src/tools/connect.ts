@@ -1,11 +1,10 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorMessage } from "../shared/errors.js";
 
-import { ClickHouseHttpMetadataClient } from "../clickhouse/client.js";
 import { inspectClickHouseConnection } from "../clickhouse/introspection.js";
-import { readClickHouseConfig } from "../config/clickhouse.js";
 import { readGuardrailConfig } from "../config/guardrails.js";
 import { runAuditedTool } from "../shared/audit.js";
+import { withClickHouseTool } from "./with-clickhouse.js";
 
 export function createConnectTool(server: McpServer): void {
   server.registerTool(
@@ -17,43 +16,22 @@ export function createConnectTool(server: McpServer): void {
       inputSchema: {}
     },
     async () =>
-      runAuditedTool("connect", {}, async () => {
-        let client: ClickHouseHttpMetadataClient | undefined;
-
-        try {
-          const config = readClickHouseConfig();
-          const guardrails = readGuardrailConfig();
-          client = new ClickHouseHttpMetadataClient(config, guardrails);
-          const info = await inspectClickHouseConnection(
-            client,
-            config,
-            guardrails
-          );
-
-          return {
-            content: [
-              {
-                type: "text",
-                text: formatConnectionInfo(info)
-              }
-            ]
-          };
-        } catch (error) {
-          return {
-            isError: true,
-            content: [
-              {
-                type: "text",
-                text: `gozzle could not connect to ClickHouse.\n\n${errorMessage(
-                  error
-                )}`
-              }
-            ]
-          };
-        } finally {
-          await client?.close();
-        }
-      })
+      runAuditedTool("connect", {}, () =>
+        withClickHouseTool(
+          async (client, config) => {
+            const guardrails = readGuardrailConfig();
+            const info = await inspectClickHouseConnection(
+              client,
+              config,
+              guardrails
+            );
+            return {
+              content: [{ type: "text", text: formatConnectionInfo(info) }]
+            };
+          },
+          (error) => `gozzle could not connect to ClickHouse.\n\n${errorMessage(error)}`
+        )
+      )
   );
 }
 

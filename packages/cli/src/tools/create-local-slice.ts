@@ -2,8 +2,6 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorMessage } from "../shared/errors.js";
 import { z } from "zod";
 
-import { ClickHouseHttpMetadataClient } from "../clickhouse/client.js";
-import { readClickHouseConfig } from "../config/clickhouse.js";
 import { readLocalSliceConfig } from "../config/local-slice.js";
 import { ChdbLocalEngine } from "../local-engine/chdb.js";
 import {
@@ -11,6 +9,7 @@ import {
   type LocalSliceResult
 } from "../local-engine/slice.js";
 import { runAuditedTool } from "../shared/audit.js";
+import { withClickHouseTool } from "./with-clickhouse.js";
 
 export function createLocalSliceTool(server: McpServer): void {
   server.registerTool(
@@ -34,40 +33,26 @@ export function createLocalSliceTool(server: McpServer): void {
       }
     },
     async ({ table, partitionId }) =>
-      runAuditedTool("create_local_slice", { table, partitionId }, async () => {
-        let client: ClickHouseHttpMetadataClient | undefined;
-        try {
-          const clickhouse = readClickHouseConfig();
-          client = new ClickHouseHttpMetadataClient(clickhouse);
-          const result = await createLocalSlice(
-            client,
-            new ChdbLocalEngine(),
-            {
-              table,
-              partitionId,
-              defaultDatabase: clickhouse.database ?? "default"
-            },
-            readLocalSliceConfig()
-          );
-          return {
-            content: [{ type: "text", text: formatLocalSliceResult(result) }]
-          };
-        } catch (error) {
-          return {
-            isError: true,
-            content: [
+      runAuditedTool("create_local_slice", { table, partitionId }, () =>
+        withClickHouseTool(
+          async (client, config) => {
+            const result = await createLocalSlice(
+              client,
+              new ChdbLocalEngine(),
               {
-                type: "text",
-                text: `gozzle could not create a local slice.\n\n${errorMessage(
-                  error
-                )}`
-              }
-            ]
-          };
-        } finally {
-          await client?.close();
-        }
-      })
+                table,
+                partitionId,
+                defaultDatabase: config.database ?? "default"
+              },
+              readLocalSliceConfig()
+            );
+            return {
+              content: [{ type: "text", text: formatLocalSliceResult(result) }]
+            };
+          },
+          (error) => `gozzle could not create a local slice.\n\n${errorMessage(error)}`
+        )
+      )
   );
 }
 

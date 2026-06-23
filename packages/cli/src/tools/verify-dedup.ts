@@ -3,10 +3,9 @@ import { errorMessage } from "../shared/errors.js";
 import { readNonNegativeInt } from "../config/env.js";
 import { z } from "zod";
 
-import { ClickHouseHttpMetadataClient } from "../clickhouse/client.js";
 import { verifyDedup, type VerifyDedupResult } from "../clickhouse/dedup.js";
-import { readClickHouseConfig } from "../config/clickhouse.js";
 import { runAuditedTool } from "../shared/audit.js";
+import { withClickHouseTool } from "./with-clickhouse.js";
 
 export function createVerifyDedupTool(server: McpServer): void {
   server.registerTool(
@@ -53,13 +52,9 @@ export function createVerifyDedupTool(server: McpServer): void {
       runAuditedTool(
         "verify_dedup",
         { table, sampleLimit, partitionId },
-        async () => {
-          let client: ClickHouseHttpMetadataClient | undefined;
-
-          try {
-            const config = readClickHouseConfig();
+        () =>
+          withClickHouseTool(async (client, config) => {
             const scanGuard = readDedupScanGuard();
-            client = new ClickHouseHttpMetadataClient(config);
             const result = await verifyDedup(client, {
               table,
               defaultDatabase: config.database ?? "default",
@@ -68,25 +63,11 @@ export function createVerifyDedupTool(server: McpServer): void {
               maxScanRows: scanGuard.maxScanRows,
               maxScanBytes: scanGuard.maxScanBytes
             });
-
             return {
               content: [{ type: "text", text: formatDedupResult(result) }],
               structuredContent: buildDedupStructured(result)
             };
-          } catch (error) {
-            return {
-              isError: true,
-              content: [
-                {
-                  type: "text",
-                  text: formatDedupError(error)
-                }
-              ]
-            };
-          } finally {
-            await client?.close();
-          }
-        }
+          }, formatDedupError)
       )
   );
 }
