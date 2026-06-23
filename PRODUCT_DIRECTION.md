@@ -36,6 +36,26 @@ that gap first.
 **Not:** agent observability; an orchestrator; an advisory linter; a
 semantic/metrics layer (that is hypequery).
 
+**The precise claim:** the unproductized gap is *agent-native,
+execution-verified migration & query correctness*. Adjacent tools exist but each
+misses a different axis — launch copy must name-drop and dismiss them, because
+reviewers will ask "isn't this just X?":
+
+- **Squawk / Atlas (Postgres migration linters)** — advisory: they check the
+  statement *reads* safe against rules. → "They lint the SQL; gozzle runs it on
+  your real data and shows you the 12k rows it nulls." (Our advisory-vs-execution
+  axis.)
+- **datafold / data-diff** — diff two *existing* datasets; they don't verify an
+  artifact's correctness or shadow a migration.
+- **dbt-audit-helper / dbt unit tests** — manual comparison macros, dbt-only.
+- **gh-ost / pt-online-schema-change** — solve migration *locking* (online schema
+  change); say nothing about *data correctness*. (Reinforces guardrail C: we own
+  data impact, not lock mechanics.)
+
+These are all older (a 180-day-repo probe can't see them) and none are
+agent-native or execution-verified — that absence is the gap, but it means the
+"open lane" is precisely the tightly-framed claim above, not a broad one.
+
 ## Core engine (north star)
 
 One loop, reused across every check and engine:
@@ -58,7 +78,7 @@ R1 gate** (see guardrail B).
 | read-path proof | a query trusts uniqueness the data violates | ClickHouse | **shipped** |
 | `dry_run_migration` | classify + estimate touched data (metadata) | ClickHouse | **shipped (metadata-only)** |
 | `verify_migration` | shadow-run a migration; prove **data impact** | Postgres/MySQL/CH | **flagship to build (R2)** |
-| `verify_equivalent` | two queries return the same result | all | next-most-valuable; pull earlier if partners want it |
+| `verify_equivalent` | two queries return the same result | all | **shipped, exact-in-source** |
 | `verify_grain` | no JOIN fan-out / double-counting | all | later |
 | `verify_incremental` / `verify_semantics` | MV vs recompute; NULL/tz/float footguns | all | later |
 
@@ -70,9 +90,18 @@ These encode deliberate pushback on the spec.
 only ever returned from an **exact** check (full scope, or a full local
 replica), as `verify_dedup` does today. Sampling is a labeled, probabilistic
 fallback that may return `likely-correct`/`indeterminate` but **never
-`correct`**. Capping the free tier's sample size is forbidden. Sample
-auto-sizing (open Q1) is the gating research problem for everything beyond exact
-checks — not just an engine detail.
+`correct`**. Capping the free tier's sample size is forbidden.
+
+*Scope correction (vs. research that called sampling "pre-R0, the whole
+company"):* sampling does **not** gate R0/R1. Every R0/R1 check — `verify_dedup`,
+read-path, `verify_equivalent`, migration impact-counts — is **exact-in-source**
+(the engine computes over all N rows; nothing is sampled), so "never a false
+`correct`" there is guaranteed by exactness, not by a representative slice.
+Sampling only bites where we must locally replicate **and** the scope exceeds
+budget — i.e. **migration shadow-execution data-correctness (R2)** and the
+sampled fallback. So sample auto-sizing (open Q1) is the gate for the **R2
+migration flagship**, and warrants a focused spike **during R1, before
+committing R2** — earlier than the licensing call, but not pre-R0.
 
 **B. Beachhead-first sequencing.** Stay ClickHouse-led, single-backend, through
 R0–R1. Do not build DuckDB, Postgres migration, more checks, or hosted infra
@@ -119,6 +148,18 @@ share, MD for PRs/agents.
 Free-riding a team's local CLI doesn't *enforce* org-wide or give *central
 visibility* — that gap is the willingness-to-pay.
 
+**Trigger reconciliation (vs. research point 3).** Agents under-trigger the MCP
+skill, so the skill alone is a flaky acquisition surface. But the fix does **not**
+require paying: a **local PostToolUse hook** is just agent config — free,
+deterministic, no hosted service — and `gozzle verify` returning a non-zero exit
+in the user's *own* CI is likewise free and deterministic. So the free tier gets
+a **reliable local trigger**, which keeps "free OSS is the distribution engine"
+honest. What's actually paid is **org-wide enforcement + central visibility**
+(required checks across a team, shared history) — not "determinism." Concretely:
+ship a free PostToolUse-hook recipe alongside `gozzle skill`; reserve org policy
+for Team. The free distribution engine is really the red-diff demo + the
+local hook/CLI in a dev's own hands — not the soft skill prompt.
+
 ## Rollout
 
 - **R0 — private alpha · ClickHouse `verify_dedup`** ← **we are here (product
@@ -135,21 +176,39 @@ visibility* — that gap is the willingness-to-pay.
   month-1 retention · pull for shared/org features.
 - **R3 — Team + hosted control plane** (opt-in, redacted; guardrail D). Gate:
   first Team accounts · multi-seat expansion.
-- **R4 — depth + ecosystem** (`verify_equivalent`/`grain`/`incremental`/
-  `semantics`; dbt + Drizzle/Prisma), driven by what paying users pull.
+- **R4 — depth + ecosystem** (`verify_grain`/`incremental`/`semantics`; dbt +
+  Drizzle/Prisma), driven by what paying users pull. (`verify_equivalent` already
+  shipped ahead of schedule as the contract-validating check.)
 
 Every phase ships a real red/green diff on a relatable bug as its launch
 artifact.
 
+**Sequencing risk — the beachhead and the flagship live in different tribes.**
+R0/R1 earn ClickHouse-community stars on `verify_dedup` (a small pond where the
+warm node lives); R2 pivots the hero to **Postgres migration**, a far larger TAM
+where there is **no warm distribution** and a different audience. ClickHouse
+stars will not automatically carry the Postgres-migration crowd. Decide
+deliberately, before R2: treat the ClickHouse launch as **engine-credibility +
+proof-of-concept**, and budget a **separate distribution motion for R2**
+(Drizzle/Prisma/Alembic communities, the migration-pain writers, a fresh
+launch) — do not assume transfer. If migration is truly the flagship, an
+alternative is to bring a Postgres `verify_migration` demo forward into the R1
+launch so the two audiences are courted together rather than sequentially.
+
 ## Open questions
 
-1. **Sample auto-sizing** — what guarantees a slice surfaces divergence without
-   replicating whole tables? Gates guardrail A and every non-exact `correct`.
-2. **chDB vs DuckDB boundary** — DuckDB default; chDB for ClickHouse-native
+1. **Sample auto-sizing** — what guarantees a slice surfaces low-frequency /
+   skewed-key divergence without replicating whole tables? Gates the **R2
+   migration flagship** (not R0/R1, which are exact-in-source). Highest-risk
+   open problem; spike during R1 before committing R2.
+2. **ClickHouse → Postgres distribution transfer** — is the R1 ClickHouse launch
+   a real flywheel for the R2 migration audience, or proof-of-concept needing a
+   separate R2 launch? Decide before R2 (see Rollout sequencing risk).
+3. **chDB vs DuckDB boundary** — DuckDB default; chDB for ClickHouse-native
    semantics (R2 decision).
-3. **Smallest hosted surface that lands the first Team** (shareable reports +
+4. **Smallest hosted surface that lands the first Team** (shareable reports +
    history) vs full governance.
-4. **Integration priority** — dbt vs Drizzle/Prisma first.
+5. **Integration priority** — dbt vs Drizzle/Prisma first.
 
 Resolved: free OSS core (already shipped); license Apache-2.0 + closed Pro/hosted;
 hosted committed but gated to R3 with privacy guardrails.
