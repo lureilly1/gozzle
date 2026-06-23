@@ -4,7 +4,7 @@
   "description": "A local safety harness and developer toolkit for ClickHouse.",
   "type": "module",
   "private": false,
-  "license": "MIT",
+  "license": "Apache-2.0",
   "bin": {
     "gozzle": "./dist/src/cli.js",
     "gozzle-mcp": "./dist/src/mcp/server.js"

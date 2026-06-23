@@ -31,6 +31,10 @@ const INDEX_TYPES = new Set<IndexEvidence["type"]>([
   "PrimaryKey"
 ]);
 
+function isIndexType(value: string): value is IndexEvidence["type"] {
+  return INDEX_TYPES.has(value as IndexEvidence["type"]);
+}
+
 export function parseExplainRows(rows: ExplainRow[]): ExplainEvidence {
   const lines = rows.map((row) => row.explain);
   const tables: TableExplainEvidence[] = [];
@@ -70,9 +74,9 @@ export function parseExplainRows(rows: ExplainRow[]): ExplainEvidence {
       readingKeys = false;
       continue;
     }
-    if (INDEX_TYPES.has(trimmed as IndexEvidence["type"])) {
+    if (isIndexType(trimmed)) {
       index = {
-        type: trimmed as IndexEvidence["type"],
+        type: trimmed,
         keys: []
       };
       table.indexes.push(index);

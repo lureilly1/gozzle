@@ -32,3 +32,11 @@ npm run dev:web      # run the docs site locally (http://localhost:3000)
 `@gozzle/cli` is published as a canary on every push to `main` via
 `.github/workflows/publish-canary.yml`. See
 [`packages/cli/README.md`](packages/cli/README.md) for details.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## License
+
+[Apache-2.0](LICENSE).

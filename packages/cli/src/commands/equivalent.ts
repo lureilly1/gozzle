@@ -1,10 +1,9 @@
 import { readFile } from "node:fs/promises";
 import { errorMessage } from "../shared/errors.js";
 
-import { ClickHouseHttpMetadataClient } from "../clickhouse/client.js";
 import { verifyEquivalent } from "../clickhouse/equivalent.js";
 import { stripSqlComments } from "../clickhouse/statement.js";
-import { readClickHouseConfig } from "../config/clickhouse.js";
+import { withClickHouseClient } from "../clickhouse/with-client.js";
 import { formatEquivalentResult } from "../tools/verify-equivalent.js";
 import { verdictExitCode } from "../shared/verdict.js";
 
@@ -64,32 +63,29 @@ export async function runEquivalentCommand(
     return 2;
   }
 
-  let client: ClickHouseHttpMetadataClient | undefined;
   try {
     const [left, right] = await Promise.all([
       readSql(files[0]),
       readSql(files[1])
     ]);
-    const config = readClickHouseConfig(env);
-    client = new ClickHouseHttpMetadataClient(config);
-    const result = await verifyEquivalent(client, {
-      left,
-      right,
-      sampleLimit: options.sampleLimit
-    });
-    console.log(
-      options.json
-        ? JSON.stringify(result, null, 2)
-        : formatEquivalentResult(result)
-    );
-    return verdictExitCode(result.verdict);
+    return await withClickHouseClient(async (client) => {
+      const result = await verifyEquivalent(client, {
+        left,
+        right,
+        sampleLimit: options.sampleLimit
+      });
+      console.log(
+        options.json
+          ? JSON.stringify(result, null, 2)
+          : formatEquivalentResult(result)
+      );
+      return verdictExitCode(result.verdict);
+    }, env);
   } catch (runError) {
     console.error(
       `gozzle equivalent could not run.\n\n${errorMessage(runError)}`
     );
     return 2;
-  } finally {
-    await client?.close();
   }
 }
 

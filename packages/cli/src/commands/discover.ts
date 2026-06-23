@@ -1,6 +1,5 @@
-import { ClickHouseHttpMetadataClient } from "../clickhouse/client.js";
 import { errorMessage } from "../shared/errors.js";
-import { readClickHouseConfig } from "../config/clickhouse.js";
+import { withClickHouseClient } from "../clickhouse/with-client.js";
 import {
   discoverWorkload,
   type WorkloadQuery
@@ -66,28 +65,25 @@ export async function runDiscoverCommand(
     return 2;
   }
 
-  let client: ClickHouseHttpMetadataClient | undefined;
   try {
-    const config = readClickHouseConfig(env);
-    client = new ClickHouseHttpMetadataClient(config);
-    const workload = await discoverWorkload(client, {
-      defaultDatabase: config.database ?? "default",
-      sinceDays: options.sinceDays,
-      limit: options.limit
-    });
-    console.log(
-      options.json
-        ? JSON.stringify(workload, null, 2)
-        : formatWorkload(workload, options.sinceDays)
-    );
-    return 0;
+    return await withClickHouseClient(async (client, config) => {
+      const workload = await discoverWorkload(client, {
+        defaultDatabase: config.database ?? "default",
+        sinceDays: options.sinceDays,
+        limit: options.limit
+      });
+      console.log(
+        options.json
+          ? JSON.stringify(workload, null, 2)
+          : formatWorkload(workload, options.sinceDays)
+      );
+      return 0;
+    }, env);
   } catch (runError) {
     console.error(
       `gozzle discover could not run.\n\n${errorMessage(runError)}`
     );
     return 2;
-  } finally {
-    await client?.close();
   }
 }
 

@@ -1,7 +1,6 @@
 import { existsSync } from "node:fs";
 
-import { ClickHouseHttpMetadataClient } from "../clickhouse/client.js";
-import { readClickHouseConfig } from "../config/clickhouse.js";
+import { withClickHouseClient } from "../clickhouse/with-client.js";
 import { readProjectConfig } from "../config/project.js";
 import { aggregateExitCode, renderHuman, verifyFiles } from "./verify.js";
 
@@ -44,28 +43,26 @@ export async function runHookRun(
   const paths = extractSqlPaths(raw);
   if (paths.length === 0) return 0;
 
-  let client: ClickHouseHttpMetadataClient | undefined;
   try {
-    const config = readClickHouseConfig(env);
-    client = new ClickHouseHttpMetadataClient(config);
-    const project = (await readProjectConfig().catch(() => undefined))?.config;
-    const outcomes = await verifyFiles(
-      client,
-      paths,
-      config.database ?? project?.database ?? "default",
-      { strict: false, json: false, changed: false, all: false },
-      env,
-      project
-    );
-    if (aggregateExitCode(outcomes) === 1) {
-      process.stderr.write(`${renderHuman(outcomes)}\n`);
-      return 2; // findings → block; stderr is shown to the agent
-    }
-    return 0;
+    return await withClickHouseClient(async (client, config) => {
+      const project = (await readProjectConfig().catch(() => undefined))
+        ?.config;
+      const outcomes = await verifyFiles(
+        client,
+        paths,
+        config.database ?? project?.database ?? "default",
+        { strict: false, json: false, changed: false, all: false },
+        env,
+        project
+      );
+      if (aggregateExitCode(outcomes) === 1) {
+        process.stderr.write(`${renderHuman(outcomes)}\n`);
+        return 2; // findings → block; stderr is shown to the agent
+      }
+      return 0;
+    }, env);
   } catch {
     return 0; // never break the agent's flow over gozzle's own issue
-  } finally {
-    await client?.close();
   }
 }
 

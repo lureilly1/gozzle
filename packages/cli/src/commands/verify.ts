@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 
 import { errorMessage } from "../shared/errors.js";
 import type { ClickHouseMetadataClient } from "../clickhouse/client.js";
-import { ClickHouseHttpMetadataClient } from "../clickhouse/client.js";
+import { withClickHouseClient } from "../clickhouse/with-client.js";
 import { diagnoseQuery } from "../clickhouse/query-diagnosis.js";
 import { dryRunMigration } from "../clickhouse/migration.js";
 import {
@@ -11,7 +11,6 @@ import {
   stripSqlComments,
   type StatementKind
 } from "../clickhouse/statement.js";
-import { readClickHouseConfig } from "../config/clickhouse.js";
 import {
   readProjectConfig,
   type GozzleProjectConfig
@@ -283,13 +282,19 @@ export async function runVerifyCommand(
 
   let targetFiles = argFiles;
   if (options.all) {
-    if (!loaded || project!.queries.length + project!.migrations.length === 0) {
+    if (
+      !loaded ||
+      loaded.config.queries.length + loaded.config.migrations.length === 0
+    ) {
       console.error(
         "gozzle verify --all needs a gozzle.yaml with queries and/or migrations globs."
       );
       return 2;
     }
-    targetFiles = await discoverConfiguredFiles(dirname(loaded.path), project!);
+    targetFiles = await discoverConfiguredFiles(
+      dirname(loaded.path),
+      loaded.config
+    );
     if (targetFiles.length === 0) {
       console.log("No ClickHouse files matched the configured globs.");
       return 0;
@@ -314,25 +319,22 @@ export async function runVerifyCommand(
     return 2;
   }
 
-  let client: ClickHouseHttpMetadataClient | undefined;
   try {
-    const config = readClickHouseConfig(env);
-    client = new ClickHouseHttpMetadataClient(config);
-    const outcomes = await verifyFiles(
-      client,
-      targetFiles,
-      config.database ?? project?.database ?? "default",
-      options,
-      env,
-      project
-    );
-    console.log(options.json ? renderJson(outcomes) : renderHuman(outcomes));
-    return aggregateExitCode(outcomes);
+    return await withClickHouseClient(async (client, config) => {
+      const outcomes = await verifyFiles(
+        client,
+        targetFiles,
+        config.database ?? project?.database ?? "default",
+        options,
+        env,
+        project
+      );
+      console.log(options.json ? renderJson(outcomes) : renderHuman(outcomes));
+      return aggregateExitCode(outcomes);
+    }, env);
   } catch (runError) {
     console.error(`gozzle verify could not run.\n\n${errorMessage(runError)}`);
     return 2;
-  } finally {
-    await client?.close();
   }
 }
 

@@ -1,11 +1,6 @@
-import {
-  ClickHouseHttpMetadataClient,
-  type ClickHouseExportClient
-} from "../clickhouse/client.js";
-import {
-  readClickHouseConfig,
-  type ClickHouseConnectionConfig
-} from "../config/clickhouse.js";
+import type { ClickHouseExportClient } from "../clickhouse/client.js";
+import type { ClickHouseConnectionConfig } from "../config/clickhouse.js";
+import { withClickHouseClient } from "../clickhouse/with-client.js";
 
 /** The text-result shape gozzle MCP tools return. The index signature keeps it
  *  assignable to the MCP SDK's CallToolResult. */
@@ -28,17 +23,12 @@ export async function withClickHouseTool(
   ) => Promise<ToolTextResult>,
   formatError: (error: unknown) => string
 ): Promise<ToolTextResult> {
-  let client: ClickHouseHttpMetadataClient | undefined;
   try {
-    const config = readClickHouseConfig();
-    client = new ClickHouseHttpMetadataClient(config);
-    return await body(client, config);
+    return await withClickHouseClient(body);
   } catch (error) {
     return {
       isError: true,
       content: [{ type: "text", text: formatError(error) }]
     };
-  } finally {
-    await client?.close();
   }
 }
