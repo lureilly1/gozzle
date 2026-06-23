@@ -29,7 +29,7 @@ jobs:
         run: npm ci
 
       - name: Set canary version
-        run: npm version "0.1.5-canary.${GITHUB_RUN_NUMBER}" --no-git-tag-version -w @gozzle/cli
+        run: npm version "0.1.6-canary.${GITHUB_RUN_NUMBER}" --no-git-tag-version -w @gozzle/cli
 
       - name: Build
         run: npm run build -w @gozzle/cli
