@@ -23,7 +23,7 @@ interface RawWorkloadRow {
   runs: string | number;
   total_read_bytes: string | number;
   total_duration_ms: string | number;
-  tables: string[];
+  query_tables: string[];
 }
 
 interface EngineRow {
@@ -54,12 +54,21 @@ export async function discoverWorkload(
       count() AS runs,
       sum(read_bytes) AS total_read_bytes,
       sum(query_duration_ms) AS total_duration_ms,
-      arrayDistinct(arrayFlatten(groupArray(tables))) AS tables
+      arrayDistinct(arrayFlatten(groupArray(tables))) AS query_tables
     FROM system.query_log
     WHERE type = 'QueryFinish'
       AND query_kind = 'Select'
       AND is_initial_query
       AND event_time > now() - toIntervalDay(${sinceDays})
+      -- Keep only queries that touch a real user table. This drops the platform's
+      -- own internal scrapers (system.*, information_schema, table functions),
+      -- which otherwise dominate the ranking on ClickHouse Cloud.
+      AND length(tables) > 0
+      AND arrayExists(
+        t -> splitByChar('.', t)[1] NOT IN ('system', 'INFORMATION_SCHEMA', 'information_schema')
+          AND NOT startsWith(t, '_table_function'),
+        tables
+      )
     GROUP BY normalized_query_hash
     ORDER BY total_read_bytes DESC
     LIMIT ${limit}
@@ -68,7 +77,7 @@ export async function discoverWorkload(
   const engines = await readEngines(client, rows, options.defaultDatabase);
 
   return rows.map((row) => {
-    const tables = Array.isArray(row.tables) ? row.tables : [];
+    const tables = Array.isArray(row.query_tables) ? row.query_tables : [];
     return {
       hash: row.hash,
       sampleQuery: row.sample_query,
@@ -92,7 +101,9 @@ async function readEngines(
 ): Promise<Map<string, string>> {
   const distinct = [
     ...new Set(
-      rows.flatMap((row) => (Array.isArray(row.tables) ? row.tables : []))
+      rows.flatMap((row) =>
+        Array.isArray(row.query_tables) ? row.query_tables : []
+      )
     )
   ];
   if (distinct.length === 0) return new Map();

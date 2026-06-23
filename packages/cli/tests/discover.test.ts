@@ -31,7 +31,7 @@ test("discoverWorkload ranks queries and flags ReplacingMergeTree tables", async
         runs: "8400",
         total_read_bytes: "12000000000",
         total_duration_ms: "90000",
-        tables: ["analytics.events", "analytics.users"]
+        query_tables: ["analytics.events", "analytics.users"]
       }
     ],
     "system.tables": [
@@ -50,6 +50,9 @@ test("discoverWorkload ranks queries and flags ReplacingMergeTree tables", async
   assert.match(client.queries[0], /FROM system\.query_log/);
   assert.match(client.queries[0], /GROUP BY normalized_query_hash/);
   assert.match(client.queries[0], /ORDER BY total_read_bytes DESC/);
+  // Filters out the platform's internal system-only queries.
+  assert.match(client.queries[0], /arrayExists/);
+  assert.match(client.queries[0], /NOT IN \('system'/);
 });
 
 test("discoverWorkload skips the engine lookup when no tables are seen", async () => {
@@ -61,7 +64,7 @@ test("discoverWorkload skips the engine lookup when no tables are seen", async (
         runs: "5",
         total_read_bytes: "0",
         total_duration_ms: "1",
-        tables: []
+        query_tables: []
       }
     ]
   });
