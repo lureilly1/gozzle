@@ -1,5 +1,5 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { errorMessage } from "../shared/errors.js";
+import { errorMessage, isResourceLimitError } from "../shared/errors.js";
 import { readNonNegativeInt } from "../config/env.js";
 import { z } from "zod";
 
@@ -204,15 +204,10 @@ export function readDedupScanGuard(
 }
 
 function formatDedupError(error: unknown): string {
-  const message = errorMessage(error);
-  const base = `gozzle could not verify deduplication.\n\n${message}`;
+  const base = `gozzle could not verify deduplication.\n\n${errorMessage(error)}`;
   // A read-limit or timeout abort means the table is too big for a single-pass
   // proof; steer the caller to the cheaper, scoped path.
-  if (
-    /max_execution_time|TIMEOUT_EXCEEDED|Limit for|too many|memory limit/i.test(
-      message
-    )
-  ) {
+  if (isResourceLimitError(error)) {
     return `${base}\n\nThis table is likely too large to prove in one pass. Re-run verify_dedup with a partitionId to scope to one partition, or create a local slice.`;
   }
   return base;

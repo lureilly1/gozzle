@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { errorMessage } from "../shared/errors.js";
 
 import { verifyEquivalent } from "../clickhouse/equivalent.js";
-import { stripSqlComments } from "../clickhouse/statement.js";
+import { normalizeSqlFile } from "../clickhouse/statement.js";
 import { withClickHouseClient } from "../clickhouse/with-client.js";
 import { formatEquivalentResult } from "../tools/verify-equivalent.js";
 import { verdictExitCode } from "../shared/verdict.js";
@@ -90,6 +90,5 @@ export async function runEquivalentCommand(
 }
 
 async function readSql(path: string): Promise<string> {
-  const raw = await readFile(path, "utf8");
-  return stripSqlComments(raw).trim().replace(/;\s*$/, "");
+  return normalizeSqlFile(await readFile(path, "utf8"));
 }

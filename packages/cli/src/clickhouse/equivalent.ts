@@ -1,5 +1,6 @@
 import type { ClickHouseMetadataClient } from "./client.js";
 import { toNumber } from "../shared/num.js";
+import { isResourceLimitError } from "../shared/errors.js";
 import { validateDiagnosticQuery } from "./query-validator.js";
 import type { Verdict } from "../shared/verdict.js";
 
@@ -93,7 +94,7 @@ export async function verifyEquivalent(
     leftOnly = toNumber(row?.left_only ?? 0);
     rightOnly = toNumber(row?.right_only ?? 0);
   } catch (error) {
-    if (isScanLimit(error)) {
+    if (isResourceLimitError(error)) {
       return {
         ...base,
         verdict: "indeterminate",
@@ -165,13 +166,6 @@ function firstNonDeterministic(query: string): string | undefined {
   const masked = query.replace(/'(?:[^'\\]|\\.|'')*'/g, "''");
   const match = masked.match(NON_DETERMINISTIC);
   return match ? match[1] : undefined;
-}
-
-function isScanLimit(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return /max_execution_time|TIMEOUT_EXCEEDED|Limit for|too many|memory limit/i.test(
-    message
-  );
 }
 
 function clampSampleLimit(value: number | undefined): number {

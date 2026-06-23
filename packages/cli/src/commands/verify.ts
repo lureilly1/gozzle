@@ -8,7 +8,7 @@ import { diagnoseQuery } from "../clickhouse/query-diagnosis.js";
 import { dryRunMigration } from "../clickhouse/migration.js";
 import {
   detectStatementKind,
-  stripSqlComments,
+  normalizeSqlFile,
   type StatementKind
 } from "../clickhouse/statement.js";
 import {
@@ -145,7 +145,7 @@ async function verifyFile(
     return outcome;
   }
 
-  const statement = stripSqlComments(raw).trim().replace(/;\s*$/, "");
+  const statement = normalizeSqlFile(raw);
   const kind = detectStatementKind(statement);
 
   try {

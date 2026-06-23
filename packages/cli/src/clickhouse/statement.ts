@@ -63,6 +63,15 @@ export function stripSqlComments(sql: string): string {
 }
 
 /**
+ * Normalize the raw contents of a `.sql` file into a single statement: strip
+ * comments, trim, and drop a trailing semicolon. This is the canonical form the
+ * verify/equivalent commands feed to the validators.
+ */
+export function normalizeSqlFile(raw: string): string {
+  return stripSqlComments(raw).trim().replace(/;\s*$/, "");
+}
+
+/**
  * Classify a statement by its leading keyword. Expects comments already
  * stripped. Returns "unknown" for anything that is not a SELECT/WITH query or an
  * ALTER migration.
