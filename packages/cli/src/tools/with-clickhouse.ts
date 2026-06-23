@@ -2,14 +2,16 @@ import type { ClickHouseExportClient } from "../clickhouse/client.js";
 import type { ClickHouseConnectionConfig } from "../config/clickhouse.js";
 import { withClickHouseClient } from "../clickhouse/with-client.js";
 
-/** The text-result shape gozzle MCP tools return. The index signature keeps it
- *  assignable to the MCP SDK's CallToolResult. */
-export interface ToolTextResult {
+/**
+ * The text-result shape gozzle MCP tools return. A `type` alias (not an
+ * interface) so it gets an implicit index signature and stays assignable to the
+ * MCP SDK's `CallToolResult`, whose schema is loose/passthrough.
+ */
+export type ToolTextResult = {
   content: { type: "text"; text: string }[];
   structuredContent?: Record<string, unknown>;
   isError?: boolean;
-  [key: string]: unknown;
-}
+};
 
 /**
  * Connect read-only, run `body`, and always close — turning any thrown error
