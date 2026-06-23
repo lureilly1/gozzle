@@ -8,6 +8,8 @@ import { renderSkill } from "./init/agent-skill.js";
 import { runVerifyCommand } from "./commands/verify.js";
 import { runDiscoverCommand } from "./commands/discover.js";
 import { runEquivalentCommand } from "./commands/equivalent.js";
+import { runHookRun } from "./commands/hook.js";
+import { renderHookRecipe } from "./init/hook-recipe.js";
 
 const metadata = readPackageMetadata();
 const command = process.argv[2] ?? "help";
@@ -52,6 +54,15 @@ if (command === "equivalent") {
   process.exit(code);
 }
 
+if (command === "hook") {
+  if (process.argv[3] === "run") {
+    const code = await runHookRun();
+    process.exit(code);
+  }
+  console.log(renderHookRecipe(process.argv.includes("--local")));
+  process.exit(0);
+}
+
 if (command === "slices") {
   await runSlicesCommand(process.argv.slice(3));
   process.exit(0);
@@ -65,6 +76,7 @@ console.log("  gozzle discover      Rank recent SELECTs from system.query_log (-
 console.log("  gozzle equivalent <a.sql> <b.sql>  Prove two queries return the same result");
 console.log("  gozzle init [host] Print MCP config (host: claude, cursor, codex; --local for project install)");
 console.log("  gozzle skill [host] Print the agent instruction to auto-verify ClickHouse changes");
+console.log("  gozzle hook        Print the PostToolUse hook recipe (gozzle hook run = the runtime)");
 console.log("  gozzle slices      List and clean local slice workspaces");
 console.log("  gozzle version     Print the CLI version");
 console.log("  gozzle-mcp         Start the MCP stdio server");
