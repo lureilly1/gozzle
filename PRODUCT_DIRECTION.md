@@ -1,139 +1,155 @@
 # gozzle Product Direction
 
-Supersedes the earlier "workload-aggregation brain" framing. The wedge is not a
-cluster scanner or a hosted brain — it is a **read-only test harness for
-ClickHouse changes** that proves whether a query or migration is safe against the
-real cluster, every time a developer touches ClickHouse SQL.
+Supersedes the earlier change-harness note. Incorporates the widened spec
+(draft v0.3) with explicit guardrails where the widening risks the one asset
+that makes gozzle defensible: the trustworthiness of a `correct` verdict.
 
-## The reframe
+> **One-liner:** Execution-verified correctness for agent-produced data & code
+> artifacts. gozzle runs the artifact against real data, proves whether it's
+> correct, and hands back a shareable red/green diff.
+>
+> **Public pitch through R1 stays ClickHouse-led** ("prove your agent's
+> ClickHouse query/migration is correct"). Vendor-neutral is the architecture,
+> not yet the marketing.
 
-> Stop: "point gozzle at a cluster and find issues."
-> Start: "every time a developer changes ClickHouse SQL, gozzle proves whether
-> the change is safe against the real cluster."
+## Where we are today (be honest about this)
 
-"Scan my cluster" is an **event**. "Verify this change" is a **habit**. Developers
-don't decide to audit a database; they change a query, open a PR, add a migration,
-or accept agent-generated SQL. gozzle must attach to that change surface.
+Shipped `@gozzle/cli@0.1.4`, ClickHouse-only, Apache-2.0/OSS, free: CLI + MCP +
+`gozzle skill`, `verify <file>/--changed/--diff/--all`, `gozzle.yaml` +
+read-path proof, `discover` (query_log), `dry_run_migration` (metadata-only),
+`create_local_slice` (chDB, single-partition RMT). **We have passed zero R0
+gates** — no design partner, no confirmed real bug caught for a partner, no live
+run against a real cluster yet. Everything below is sequenced behind closing
+that gap first.
 
-Core primitive:
+## Positioning (two axes that keep us sharp)
 
-```bash
-gozzle verify ./queries/revenue.sql
-gozzle verify --changed          # prove the ClickHouse impact of this branch
+- **Artifact-correctness, not run-verification.** We verify the *thing produced*
+  (the query/migration), never the *agent process*. Run-verification (Braintrust,
+  Langfuse, Phoenix, Laminar) is crowded and not ours. Never grow into
+  tracing/eval.
+- **Execution-verified, not advisory.** Advisory tools (official ClickHouse
+  skill, linters) inject *rules*; gozzle *executes and proves* them against real
+  data. We are a **complement** to advisory skills — pursue cross-listing, don't
+  compete.
+
+**Not:** agent observability; an orchestrator; an advisory linter; a
+semantic/metrics layer (that is hypequery).
+
+## Core engine (north star)
+
+One loop, reused across every check and engine:
+
+```
+detect → replicate (locally) → run [as-written] + [reference] → diff → verdict → report
 ```
 
-Identity:
-- Primary: **the read-only test harness for ClickHouse changes.**
-- AI sub-positioning: **the proof layer for ClickHouse agents** — the official
-  ClickHouse skill gives advice; gozzle proves whether the advice survives contact
-  with the user's real schema and data.
+A pluggable `ExecutionBackend` keeps the loop engine-agnostic (introspect /
+replicate / run / reference). **chDB** is the proven ClickHouse backend today;
+**DuckDB** (Postgres/MySQL/generic) is the R2 expansion. The interface is the
+architectural north star **now**; the second backend is built **only after the
+R1 gate** (see guardrail B).
 
-## Two ideas that make it work
+## Check catalog
 
-**1. Repo context, not cluster memory.** gozzle needs *project configuration*, not
-a stateful hosted brain. A `gozzle.yaml` declares where SQL lives, the read-only
-connection profile, and — critically — **assumptions** (uniqueness, append-only,
-engine). This is local and versioned, like `tsconfig`/`dbt_project.yml`.
+| Check | Proves | Engines | Status today |
+|---|---|---|---|
+| `verify_dedup` | result matches settled merge/dedup state | ClickHouse (Postgres later) | **shipped, exact** |
+| read-path proof | a query trusts uniqueness the data violates | ClickHouse | **shipped** |
+| `dry_run_migration` | classify + estimate touched data (metadata) | ClickHouse | **shipped (metadata-only)** |
+| `verify_migration` | shadow-run a migration; prove **data impact** | Postgres/MySQL/CH | **flagship to build (R2)** |
+| `verify_equivalent` | two queries return the same result | all | next-most-valuable; pull earlier if partners want it |
+| `verify_grain` | no JOIN fan-out / double-counting | all | later |
+| `verify_incremental` / `verify_semantics` | MV vs recompute; NULL/tz/float footguns | all | later |
 
-```yaml
-connection: clickhouse-prod-readonly
-queries: [app/**/*.sql, dashboards/**/*.sql, dbt/models/**/*.sql]
-migrations: [migrations/**/*.sql]
-assumptions:
-  events: { unique_by: [event_id], engine: ReplacingMergeTree }
-  raw_events: { append_only: true }
-```
+## Guardrails (where the widening must not cut corners)
 
-**2. Read-path proof, not "duplicates exist."** Sophisticated users expect
-duplicates in ReplacingMergeTree *storage*; the bug is a read path that trusts
-uniqueness the data violates. The wow output is:
-`revenue_by_customer.sql` reads `events` as if `event_id` is unique, but the table
-currently has N unresolved duplicate keys → this query can overcount.
+These encode deliberate pushback on the spec.
 
-The declared `assumptions` block is what makes this **tractable**: instead of
-inferring uniqueness intent from arbitrary SQL (a research problem), gozzle checks
-(a) does current data violate the declared key (`verify_dedup`), and (b) does the
-query read that table without FINAL/dedup. Lead with the qualitative violation;
-treat an exact "overcounts by X%" as a later stretch (needs bounded execution).
+**A. Exactness over sampling — protect the meaning of `correct`.** `correct` is
+only ever returned from an **exact** check (full scope, or a full local
+replica), as `verify_dedup` does today. Sampling is a labeled, probabilistic
+fallback that may return `likely-correct`/`indeterminate` but **never
+`correct`**. Capping the free tier's sample size is forbidden. Sample
+auto-sizing (open Q1) is the gating research problem for everything beyond exact
+checks — not just an engine detail.
 
-## Commercial guardrail (the line we will not cross for free)
+**B. Beachhead-first sequencing.** Stay ClickHouse-led, single-backend, through
+R0–R1. Do not build DuckDB, Postgres migration, more checks, or hosted infra
+until the R1 gate is met. The `ExecutionBackend` interface may exist as design;
+the second backend may not be implemented early.
 
-**Local / one-shot / non-persisted = free, build now. Hosted / persisted / team /
-shared = paid, hold off.** We do not build the paid moat for free. Anything that
-could be the team/CI product is parked until the paid layer.
+**C. `verify_migration` = data impact, not lock duration.** Run the migration on
+a **full local replica** and diff: rows touched / nulled / dropped, row-count
+drift. That is honest and locally verifiable. **Lock duration and operational
+impact are production-cluster properties a local slice cannot predict** — do not
+emit a number for them (a static, clearly-advisory heuristic at most). A wrong
+lock estimate violates guardrail A.
 
-The habit-forming surfaces are the ones that fire automatically — a CI exit code
-and the agent auto-trigger — *not* the manual command (most branches don't touch
-ClickHouse, so `verify --changed` is often empty). We ship the free primitives
-that enable both, but **not** the productized team CI integration.
+**D. Hosted control plane must not silently break local-first.** Shareable
+hosted reports contain table names, query text, and divergent-row samples — i.e.
+production data leaving the machine. Hosted is gated behind R2 revenue and must
+be opt-in, redact row samples by default, and prefer customer-controlled
+storage. The free/local path always stays fully local.
 
-## Build now — free / local only
+## Surfaces & distribution (shipped)
 
-1. **Release a real `latest`.** Not just a dist-tag flip: commit + publish the
-   current working tree (includes the P0 large-table dedup safety guard), then
-   point `latest` at it. The default install must be safe on big tables.
-2. **`gozzle.yaml`** — config loader: connection profile, query/migration globs,
-   `assumptions` (unique_by / append_only / engine). Local, versioned.
-3. **`verify --query <file>` / `verify --changed` / `--diff`** — run the existing
-   verifier engine over changed SQL/migrations; exit non-zero on findings so users
-   can wire it into *their own* CI. (We provide the primitive, not a hosted Action.)
-4. **Read-path / assumption-violation proof** — declared-intent version: for each
-   query on a declared-unique table, prove data violates the key + the query lacks
-   FINAL. Qualitative first; exact percentages deferred.
-5. **Local discovery** — repo globs first (`.sql`, migrations, dbt/sqlmesh); then a
-   one-shot, **non-persisted** `system.query_log` import (discovery, not
-   monitoring).
-6. **Agent trigger skill** — local: when ClickHouse SQL/migrations are written,
-   modified, or reviewed and a `gozzle.yaml` exists, the agent runs gozzle to
-   verify before presenting a final answer.
-7. **`scan_cluster` / `inspect_table`** — keep as onboarding / first-run wow /
-   design-partner measurement, not the daily habit.
+MCP server (the "verify before done" agent loop) · `gozzle skill` (the trigger)
+· CLI (humans + CI exit code) · CI gate/PR comment (paid). BYOK, local-first,
+multi-agent, global or project-local install. **The diff report is a first-class
+product** — glanceable verdict, engine context, row/impact delta, divergent-row
+sample, suggested fix, honesty footer (`sampled N rows · local · 1.4s`); HTML to
+share, MD for PRs/agents.
 
-## Hold — paid (hosted / persisted / team)
+## Packaging, licensing & gating
 
-Do **not** build these now; they are the paid layer:
-- Hosted CI / GitHub-GitLab App that posts PR comments.
-- Shared or persisted proof-artifact history (server-side storage).
-- Team policy config, required-checks management, per-seat licensing.
-- Any retained cluster/workload state or monitoring over time (the rejected
-  "brain").
+- **License:** Apache-2.0 OSS core; Pro features + hosted control plane closed.
+  The moat is the closed layer + operated infra + hypequery distribution + the
+  depth of the reference-rule library — not the license.
+- **Gate on team / scale / ops, never on correctness-confidence.** The free
+  individual experience is fully, genuinely useful — that is the distribution
+  engine.
 
-## Later (bigger local features, after retention is proven)
+| Tier | Gets | Gated on | Price |
+|---|---|---|---|
+| **OSS core** | engine, CLI, skill, MCP, **every check**, full local verdicts + diff reports, self-host | — | Free, Apache-2.0 |
+| **Pro** | CI gating, persistent hosted shareable reports, history, hosted control plane, all backends | automation + collaboration + operated convenience | card-required (~$39–49/dev/mo) |
+| **Team** | org-policy enforcement, audit, SSO/RBAC, shared config, cluster-scoped creds | org governance at scale | hybrid per-cluster |
 
-- Materialized-view correctness — a real build; next bet once branch-verification
-  shows retention.
-- Inferring uniqueness assumptions from SQL (vs. declared) and exact overcount %.
+Free-riding a team's local CLI doesn't *enforce* org-wide or give *central
+visibility* — that gap is the willingness-to-pay.
 
-## Commercial split
+## Rollout
 
-- **Free / local:** CLI, MCP server, `gozzle.yaml`, `verify --query/--changed`,
-  local + one-shot discovery, local proof output, non-zero CI exit code, agent
-  skill, `scan_cluster`.
-- **Paid / hosted:** GitHub/GitLab app + PR comments, shared/persisted proof
-  history, team policy + required checks, license/seat management.
+- **R0 — private alpha · ClickHouse `verify_dedup`** ← **we are here (product
+  built, not yet validated).** Hand-install with hypequery + warm ClickHouse
+  contacts. Gate: 5–10 design partners · ≥1 confirmed real bug each · "I'd keep
+  using this." **Also required before R1: one live run against a real cluster**
+  (still outstanding) to verify `verify_dedup`, the read-path proof, and
+  `discover`'s query_log SQL.
+- **R1 — public OSS launch · skill + MCP + CLI.** Marketplaces, ClickHouse
+  amplification, red-diff Show-HN. No paid tier. Gate: install/star traction · N
+  active repos · ≥2 inbound purchase-intent signals.
+- **R2 — broadening + first revenue · DuckDB + Postgres `verify_migration`
+  (data-impact); Pro launches** (card-required). Gate: first paying devs ·
+  month-1 retention · pull for shared/org features.
+- **R3 — Team + hosted control plane** (opt-in, redacted; guardrail D). Gate:
+  first Team accounts · multi-seat expansion.
+- **R4 — depth + ecosystem** (`verify_equivalent`/`grain`/`incremental`/
+  `semantics`; dbt + Drizzle/Prisma), driven by what paying users pull.
 
-Teams already pay for CI guardrails (typecheck, security scan, lint). "Correctness
-gate for ClickHouse changes" fits that budget — but only the *hosted/team* form is
-paid; the local primitive is free and open source.
+Every phase ships a real red/green diff on a relatable bug as its launch
+artifact.
 
-## What this changes about what's built
+## Open questions
 
-- **Keeper (the asset):** the verifier engine — `dedup.ts`, `migration.ts`,
-  `query-diagnosis.ts`, introspection, the read-only client. `verify --changed`,
-  the agent, and (later) CI all reuse it. Nothing is wasted.
-- **New free workflow layer to build:** `gozzle.yaml` loader → discovery /
-  `--changed` / `--diff` → assumption-violation proof → agent trigger skill.
-- **Demoted to supporting/onboarding:** `inspect_table` + `scan_cluster`;
-  `create_local_slice` (reproduce a finding offline, not a headline).
-- **Website:** reframed from "safety harness / brain" to "test harness for
-  ClickHouse changes." (Hero copy already updated.)
+1. **Sample auto-sizing** — what guarantees a slice surfaces divergence without
+   replicating whole tables? Gates guardrail A and every non-exact `correct`.
+2. **chDB vs DuckDB boundary** — DuckDB default; chDB for ClickHouse-native
+   semantics (R2 decision).
+3. **Smallest hosted surface that lands the first Team** (shareable reports +
+   history) vs full governance.
+4. **Integration priority** — dbt vs Drizzle/Prisma first.
 
-## Validation metric
-
-Not "number of clusters with duplicates." The metric is the **non-empty
-meaningful finding rate** — users who say *"I didn't know this, and I need to fix
-it,"* tied to a named query, dashboard, or migration they care about. Have 5–10
-ClickHouse users run init → discover → verify --changed → scan, and measure: did
-it surprise them, was it tied to something they care about, would they put it in
-CI, did they trust the read-only/local posture, did they understand the output
-without ClickHouse expertise.
+Resolved: free OSS core (already shipped); license Apache-2.0 + closed Pro/hosted;
+hosted committed but gated to R3 with privacy guardrails.
