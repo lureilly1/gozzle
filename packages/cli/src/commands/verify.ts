@@ -1,15 +1,11 @@
-import { execFile } from "node:child_process";
-import { errorMessage } from "../shared/errors.js";
-import { existsSync } from "node:fs";
-import { readdir, readFile } from "node:fs/promises";
-import { dirname, join, relative, sep } from "node:path";
-import { promisify } from "node:util";
+import { dirname } from "node:path";
+import { readFile } from "node:fs/promises";
 
+import { errorMessage } from "../shared/errors.js";
 import type { ClickHouseMetadataClient } from "../clickhouse/client.js";
 import { ClickHouseHttpMetadataClient } from "../clickhouse/client.js";
-import { diagnoseQuery, type DiagnoseQueryResult } from "../clickhouse/query-diagnosis.js";
+import { diagnoseQuery } from "../clickhouse/query-diagnosis.js";
 import { dryRunMigration } from "../clickhouse/migration.js";
-import { verifyDedup } from "../clickhouse/dedup.js";
 import {
   detectStatementKind,
   stripSqlComments,
@@ -17,26 +13,32 @@ import {
 } from "../clickhouse/statement.js";
 import { readClickHouseConfig } from "../config/clickhouse.js";
 import {
-  matchesAnyGlob,
   readProjectConfig,
-  type GozzleProjectConfig,
-  type TableAssumption
+  type GozzleProjectConfig
 } from "../config/project.js";
 import { formatQueryDiagnosis } from "../tools/diagnose-query.js";
-import { formatMigrationResult, } from "../tools/dry-run-migration.js";
-import { readDedupScanGuard } from "../tools/verify-dedup.js";
-import { formatCount } from "../shared/format.js";
+import { formatMigrationResult } from "../tools/dry-run-migration.js";
 import { recordAudit } from "../shared/audit.js";
+import {
+  checkReadPaths,
+  formatReadPaths,
+  type ReadPathOutcome
+} from "./verify-read-path.js";
+import {
+  discoverConfiguredFiles,
+  selectVerifiableFiles
+} from "./verify-discover.js";
+import { resolveGitFiles } from "./verify-git.js";
 
-export interface ReadPathOutcome {
-  table: string;
-  uniqueBy: string[];
-  status: "violated" | "clean" | "unknown";
-  duplicateRows: number;
-  message: string;
-}
-
-const execFileAsync = promisify(execFile);
+// Re-exported so `../src/commands/verify.js` stays the public entry point for
+// the verify command's surface (tests and callers import from here).
+export {
+  checkReadPaths,
+  formatReadPaths,
+  discoverConfiguredFiles,
+  selectVerifiableFiles
+};
+export type { ReadPathOutcome };
 
 export interface VerifyOptions {
   strict: boolean;
@@ -94,22 +96,6 @@ export function parseVerifyArgs(argv: string[]): ParsedVerifyArgs {
   }
 
   return { files, options };
-}
-
-/**
- * Filter a list of paths to the ones gozzle should verify: those matching the
- * configured query/migration globs, or — with no config — any `.sql` file.
- */
-export function selectVerifiableFiles(
-  files: string[],
-  config?: GozzleProjectConfig
-): string[] {
-  const globs = config ? [...config.queries, ...config.migrations] : [];
-  return files.filter((file) =>
-    globs.length > 0
-      ? matchesAnyGlob(file, globs)
-      : file.replaceAll("\\", "/").endsWith(".sql")
-  );
 }
 
 /**
@@ -339,155 +325,6 @@ export async function runVerifyCommand(
   } finally {
     await client?.close();
   }
-}
-
-/** Resolve the changed/diffed files git reports, filtered to verifiable SQL. */
-async function resolveGitFiles(
-  options: VerifyOptions,
-  project: GozzleProjectConfig | undefined
-): Promise<string[]> {
-  const root = (await gitLines(["rev-parse", "--show-toplevel"]))[0];
-  if (!root) throw new Error("not inside a git repository.");
-
-  let changed: string[];
-  if (options.diff) {
-    changed = await gitLines(["diff", "--name-only", options.diff]);
-  } else {
-    const tracked = await gitLines(["diff", "--name-only", "HEAD"]);
-    const untracked = await gitLines([
-      "ls-files",
-      "--others",
-      "--exclude-standard"
-    ]);
-    changed = [...new Set([...tracked, ...untracked])];
-  }
-
-  return selectVerifiableFiles(changed, project)
-    .map((file) => join(root, file))
-    .filter((file) => existsSync(file));
-}
-
-async function gitLines(args: string[]): Promise<string[]> {
-  const { stdout } = await execFileAsync("git", args);
-  return stdout
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
-}
-
-const IGNORED_DIRS = new Set([
-  "node_modules",
-  ".git",
-  "dist",
-  ".next",
-  ".gozzle"
-]);
-
-/** Walk `root`, returning forward-slash paths relative to it (skipping junk). */
-export async function walkFiles(root: string, dir: string = root): Promise<string[]> {
-  const entries = await readdir(dir, { withFileTypes: true });
-  const files: string[] = [];
-  for (const entry of entries) {
-    const full = join(dir, entry.name);
-    if (entry.isDirectory()) {
-      if (IGNORED_DIRS.has(entry.name)) continue;
-      files.push(...(await walkFiles(root, full)));
-    } else if (entry.isFile()) {
-      files.push(relative(root, full).split(sep).join("/"));
-    }
-  }
-  return files;
-}
-
-/** Discover every configured query/migration file under `root` as absolute paths. */
-export async function discoverConfiguredFiles(
-  root: string,
-  config: GozzleProjectConfig
-): Promise<string[]> {
-  const all = await walkFiles(root);
-  return selectVerifiableFiles(all, config).map((rel) => join(root, rel));
-}
-
-/**
- * The read-path proof: for each table the query reads that is declared unique
- * (gozzle.yaml assumptions) and is read without FINAL, check whether current
- * data actually violates that uniqueness — turning "duplicates exist" into
- * "this query can overcount."
- */
-export async function checkReadPaths(
-  client: ClickHouseMetadataClient,
-  result: DiagnoseQueryResult,
-  config: GozzleProjectConfig | undefined,
-  defaultDatabase: string,
-  env: NodeJS.ProcessEnv
-): Promise<ReadPathOutcome[]> {
-  if (!config || result.query.hasFinal) return [];
-
-  const guard = readDedupScanGuard(env);
-  const outcomes: ReadPathOutcome[] = [];
-  for (const table of result.explain.tables) {
-    const assumption = findAssumption(config, table.table);
-    if (!assumption?.uniqueBy || assumption.uniqueBy.length === 0) continue;
-
-    let dedup;
-    try {
-      dedup = await verifyDedup(client, {
-        table: table.table,
-        defaultDatabase,
-        maxScanRows: guard.maxScanRows,
-        maxScanBytes: guard.maxScanBytes
-      });
-    } catch {
-      continue; // cannot prove this table; leave it out rather than guess
-    }
-    if (!dedup.eligible) continue;
-
-    const keys = assumption.uniqueBy.join(", ");
-    if (dedup.scanSkipped) {
-      outcomes.push({
-        table: table.table,
-        uniqueBy: assumption.uniqueBy,
-        status: "unknown",
-        duplicateRows: 0,
-        message: `${table.table} is too large to confirm; it is declared unique by (${keys}) and read without FINAL.`
-      });
-    } else if (dedup.finalCollapsibleRows > 0) {
-      outcomes.push({
-        table: table.table,
-        uniqueBy: assumption.uniqueBy,
-        status: "violated",
-        duplicateRows: dedup.finalCollapsibleRows,
-        message: `${table.table} is read without FINAL and trusted as unique by (${keys}), but currently has ${formatCount(dedup.finalCollapsibleRows)} duplicate row(s) by sorting key — this query can overcount.`
-      });
-    } else {
-      outcomes.push({
-        table: table.table,
-        uniqueBy: assumption.uniqueBy,
-        status: "clean",
-        duplicateRows: 0,
-        message: `${table.table} is declared unique by (${keys}) and currently has no duplicates.`
-      });
-    }
-  }
-  return outcomes;
-}
-
-function findAssumption(
-  config: GozzleProjectConfig,
-  explainTable: string
-): TableAssumption | undefined {
-  if (config.assumptions[explainTable]) return config.assumptions[explainTable];
-  const bare = explainTable.includes(".")
-    ? explainTable.slice(explainTable.lastIndexOf(".") + 1)
-    : explainTable;
-  return config.assumptions[bare];
-}
-
-export function formatReadPaths(items: ReadPathOutcome[]): string {
-  if (items.length === 0) return "";
-  return ["Read-path proof:", ...items.map((it) => `- [${it.status}] ${it.message}`)].join(
-    "\n"
-  );
 }
 
 async function audit(
