@@ -3,6 +3,8 @@ title: Quickstart
 description: Install gozzle and run your first proof against ClickHouse in a few minutes
 ---
 
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+
 This walks you from zero to your first **verdict with proof** — gozzle finding (or
 clearing) duplicate rows in a real ClickHouse table. It takes a few minutes.
 
@@ -13,7 +15,11 @@ clearing) duplicate rows in a real ClickHouse table. It takes a few minutes.
   user is ideal — gozzle never needs more)
 - An MCP host: **Claude Code**, **Cursor**, or **Codex**
 
-## 1. Install
+<Steps>
+
+<Step>
+
+### Install
 
 ```bash
 npm install -g @gozzle/cli
@@ -22,7 +28,11 @@ npm install -g @gozzle/cli
 This installs two binaries: `gozzle` (the CLI) and `gozzle-mcp` (the MCP stdio
 server your AI host talks to).
 
-## 2. Configure your AI host
+</Step>
+
+<Step>
+
+### Configure your AI host
 
 Print the MCP config block for your host and the file it belongs in:
 
@@ -53,7 +63,11 @@ with your ClickHouse details. Use a **read-only** user — gozzle forces
 
 Restart your AI host so it picks up the new server.
 
-## 3. Connect
+</Step>
+
+<Step>
+
+### Connect
 
 Ask your agent to run the `connect` tool, or just say:
 
@@ -68,7 +82,11 @@ No data leaves this machine.
 Read-only enforced by gozzle: yes (readonly=2)
 ```
 
-## 4. Inspect a table
+</Step>
+
+<Step>
+
+### Inspect a table
 
 Point gozzle at a table to see its physical layout and which checks it is
 eligible for:
@@ -79,7 +97,11 @@ eligible for:
 counts — and tells you whether the table can be checked with
 [`verify_dedup`](/docs/verify-dedup).
 
-## 5. Prove it — `verify_dedup`
+</Step>
+
+<Step>
+
+### Prove it — `verify_dedup`
 
 For a `ReplacingMergeTree`-family table, ask:
 
@@ -100,6 +122,10 @@ Risk: dashboards querying without FINAL may overcount
 
 That is the proof moment: a claim a plain `SELECT count()` can't make, backed by
 ClickHouse's own semantics.
+
+</Step>
+
+</Steps>
 
 ## Verify changes in your workflow
 
