@@ -1,9 +1,69 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import styles from './home.module.css';
-import { C, GITHUB_URL, GOOSE, INSTALL_COMMAND } from './theme';
+import { C, GITHUB_URL, GOOSE, INSTALL_COMMAND, mono } from './theme';
+
+// Shared outer wrapper + nav + terminal frame so every page is exactly the same
+// size and chrome — no layout shift when navigating between home and faq.
+const SHELL_MAX_WIDTH = 1240;
+const SHELL_MIN_HEIGHT = 660;
+
+export function PageShell({
+  title = '~/gozzle',
+  children,
+}: {
+  title?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      className={`${mono.className} ${styles.root}`}
+      style={{
+        width: '100%',
+        height: '100vh',
+        minHeight: SHELL_MIN_HEIGHT,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '28px 24px',
+      }}
+    >
+      <div
+        style={{
+          width: '100%',
+          maxWidth: SHELL_MAX_WIDTH,
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+        }}
+      >
+        <SiteNav />
+
+        {/* terminal frame */}
+        <div
+          style={{
+            flex: '1 1 auto',
+            minHeight: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            border: '1px solid rgba(242,193,78,.45)',
+            borderRadius: 12,
+            background: 'linear-gradient(180deg,#101010,#0c0c0c)',
+            boxShadow:
+              '0 0 0 1px rgba(0,0,0,.4),0 40px 90px -30px rgba(0,0,0,.9),inset 0 1px 0 rgba(255,255,255,.03)',
+            overflow: 'hidden',
+          }}
+        >
+          <TitleBar label={title} />
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function CopyInstall() {
   const [copied, setCopied] = useState(false);
@@ -174,11 +234,10 @@ export function InstallBar() {
         onClick={copy}
         title="Copy install command"
         style={{
-          display: 'flex',
+          display: 'inline-flex',
           alignItems: 'center',
-          gap: 11,
-          flex: 1,
-          minWidth: 0,
+          gap: 12,
+          flex: 'none',
           background: 'transparent',
           border: 'none',
           padding: 0,
@@ -188,16 +247,14 @@ export function InstallBar() {
           textAlign: 'left',
         }}
       >
-        <code style={{ color: C.text, fontSize: 14, flex: 1, minWidth: 0 }}>
-          {INSTALL_COMMAND}
-        </code>
+        <code style={{ color: C.text, fontSize: 14 }}>{INSTALL_COMMAND}</code>
         <span
           style={{
             color: C.amber,
             fontSize: 12.5,
             fontWeight: 700,
-            minWidth: 56,
-            textAlign: 'right',
+            minWidth: 52,
+            textAlign: 'left',
             flex: 'none',
           }}
         >
@@ -217,7 +274,7 @@ export function InstallBar() {
       <pre
         className={styles.bob}
         style={{
-          margin: 0,
+          margin: '0 0 0 auto',
           color: C.amber,
           fontSize: 9,
           lineHeight: 1.05,

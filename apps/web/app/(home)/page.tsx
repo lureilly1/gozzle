@@ -2,8 +2,8 @@
 
 import Link from 'next/link';
 import styles from './home.module.css';
-import { C, GITHUB_URL, mono } from './theme';
-import { InstallBar, SiteNav, TitleBar } from './chrome';
+import { C, GITHUB_URL } from './theme';
+import { InstallBar, PageShell } from './chrome';
 
 const HEADLINE = 'Your AI agent says it’s fine. gozzle proves it.';
 
@@ -35,56 +35,14 @@ const REASONS = [
 
 export default function HomePage() {
   return (
-    <div
-      className={`${mono.className} ${styles.root}`}
-      style={{
-        width: '100%',
-        height: '100vh',
-        minHeight: 660,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '28px 24px',
-      }}
-    >
-      <div
-        style={{
-          width: '100%',
-          maxWidth: 1240,
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-        }}
-      >
-        <SiteNav />
-
-        {/* terminal frame */}
-        <div
-          style={{
-            flex: '1 1 auto',
-            minHeight: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            border: '1px solid rgba(242,193,78,.45)',
-            borderRadius: 12,
-            background: 'linear-gradient(180deg,#101010,#0c0c0c)',
-            boxShadow:
-              '0 0 0 1px rgba(0,0,0,.4),0 40px 90px -30px rgba(0,0,0,.9),inset 0 1px 0 rgba(255,255,255,.03)',
-            overflow: 'hidden',
-          }}
-        >
-          <TitleBar />
-
-          <div className={styles.body}>
-            <PitchColumn />
-            <ProofColumn />
-          </div>
-
-          <InstallBar />
-        </div>
+    <PageShell title="~/gozzle">
+      <div className={styles.body}>
+        <PitchColumn />
+        <ProofColumn />
       </div>
-    </div>
+
+      <InstallBar />
+    </PageShell>
   );
 }
 

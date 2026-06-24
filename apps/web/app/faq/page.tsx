@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import styles from '../(home)/home.module.css';
-import { C, GITHUB_URL, GOOSE, mono } from '../(home)/theme';
-import { SiteNav, TitleBar } from '../(home)/chrome';
+import { C, GITHUB_URL, GOOSE } from '../(home)/theme';
+import { PageShell } from '../(home)/chrome';
 
 const FAQS: Array<{ q: string; tag: string; a: string }> = [
   {
@@ -45,54 +45,16 @@ export default function FaqPage() {
     setOpen((prev) => ({ ...prev, [i]: !prev[i] }));
 
   return (
-    <div
-      className={`${mono.className} ${styles.root}`}
-      style={{
-        width: '100%',
-        height: '100vh',
-        minHeight: 680,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '28px 24px',
-      }}
-    >
+    <PageShell title="~/man/gozzle">
       <div
         style={{
-          width: '100%',
-          maxWidth: 920,
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
+          flex: '1 1 auto',
+          minHeight: 0,
+          overflow: 'auto',
+          padding: '26px 36px',
         }}
       >
-        <SiteNav />
-
-        <div
-          style={{
-            flex: '1 1 auto',
-            minHeight: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            border: '1px solid rgba(242,193,78,.45)',
-            borderRadius: 12,
-            background: 'linear-gradient(180deg,#101010,#0c0c0c)',
-            boxShadow:
-              '0 0 0 1px rgba(0,0,0,.4),0 40px 90px -30px rgba(0,0,0,.9),inset 0 1px 0 rgba(255,255,255,.03)',
-            overflow: 'hidden',
-          }}
-        >
-          <TitleBar label="~/man/gozzle" />
-
-          <div
-            style={{
-              flex: '1 1 auto',
-              minHeight: 0,
-              overflow: 'auto',
-              padding: '26px 36px',
-            }}
-          >
+        <div style={{ maxWidth: 760, margin: '0 auto' }}>
             <div
               style={{
                 color: C.comment,
@@ -181,17 +143,18 @@ export default function FaqPage() {
               })}
             </div>
           </div>
+        </div>
 
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 11,
-              padding: '13px 18px',
-              borderTop: '1px solid rgba(242,193,78,.28)',
-              background: 'rgba(242,193,78,.035)',
-            }}
-          >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 11,
+            padding: '13px 18px',
+            borderTop: '1px solid rgba(242,193,78,.28)',
+            background: 'rgba(242,193,78,.035)',
+          }}
+        >
             <span
               style={{
                 color: C.amber,
@@ -226,8 +189,6 @@ export default function FaqPage() {
               {GOOSE}
             </pre>
           </div>
-        </div>
-      </div>
-    </div>
+      </PageShell>
   );
 }
