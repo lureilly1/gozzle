@@ -29,7 +29,7 @@ const FAQS: Array<{ q: string; tag: string; a: string }> = [
   {
     q: 'Is it free?',
     tag: '// license',
-    a: 'Yes — gozzle is free and open source under the MIT license. Install it from npm, read the source on GitHub, and contributions are welcome.',
+    a: 'Yes — gozzle is free and open source under the Apache 2.0 license. Install it from npm, read the source on GitHub, and contributions are welcome.',
   },
   {
     q: 'How do I get started?',
