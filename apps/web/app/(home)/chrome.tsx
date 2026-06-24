@@ -135,6 +135,18 @@ export function TitleBar({ label = '~/gozzle' }: { label?: string }) {
 
 /** Bottom terminal bar showing the install command — the open-source CTA. */
 export function InstallBar() {
+  const [copied, setCopied] = useState(false);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(INSTALL_COMMAND);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // clipboard unavailable; ignore
+    }
+  };
+
   return (
     <div
       style={{
@@ -157,9 +169,41 @@ export function InstallBar() {
         gozzle-$
       </span>
       <span style={{ color: C.muted, fontSize: 14 }}>#</span>
-      <code style={{ color: C.text, fontSize: 14, flex: 1, minWidth: 0 }}>
-        {INSTALL_COMMAND}
-      </code>
+      <button
+        type="button"
+        onClick={copy}
+        title="Copy install command"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 11,
+          flex: 1,
+          minWidth: 0,
+          background: 'transparent',
+          border: 'none',
+          padding: 0,
+          margin: 0,
+          cursor: 'pointer',
+          font: 'inherit',
+          textAlign: 'left',
+        }}
+      >
+        <code style={{ color: C.text, fontSize: 14, flex: 1, minWidth: 0 }}>
+          {INSTALL_COMMAND}
+        </code>
+        <span
+          style={{
+            color: C.amber,
+            fontSize: 12.5,
+            fontWeight: 700,
+            minWidth: 56,
+            textAlign: 'right',
+            flex: 'none',
+          }}
+        >
+          {copied ? 'copied!' : 'copy'}
+        </span>
+      </button>
       <span
         className={styles.blink}
         style={{
