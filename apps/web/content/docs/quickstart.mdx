@@ -86,7 +86,7 @@ Read-only enforced by gozzle: yes (readonly=2)
 
 <Step>
 
-### Inspect a table
+### Inspect a table, then run a check
 
 Point gozzle at a table to see its physical layout and which checks it is
 eligible for:
@@ -94,40 +94,20 @@ eligible for:
 > Inspect the table `analytics.events` with gozzle.
 
 `inspect_table` reports the engine, sorting/partition keys, parts, and row
-counts — and tells you whether the table can be checked with
-[`verify_dedup`](/docs/verify-dedup).
+counts. From there, run the check that fits what you're changing — each returns
+a verdict plus proof:
 
-</Step>
-
-<Step>
-
-### Verify a change — `gozzle verify`
-
-`gozzle verify` is the everyday verb and gozzle's leading feature: point it at a
-changed `.sql` file or your branch's diff and it proves whether the change is
-safe against the real cluster, **exiting non-zero on findings** — so it drops
-straight into a pre-commit hook or CI.
-
-```bash
-gozzle verify ./queries/revenue.sql        # one file
-gozzle verify --changed                     # everything changed on this branch
-```
-
-A `SELECT` is diagnosed with `EXPLAIN`; an `ALTER` is dry-run — the original is
-never executed. Add a [`gozzle.yaml`](/docs/verify#gozzleyaml) with your tables'
-`unique_by` assumptions to unlock the read-path proof, which catches a query
-that reads a deduplicated table without `FINAL` and can silently overcount:
-
-```text
-Read-path proof:
-- [violated] analytics.events is read without FINAL and trusted as unique by
-  (event_id), but currently has 2,400,000 duplicate row(s) by sorting key —
-  this query can overcount.
-```
-
-That is the proof moment: a claim a plain `SELECT count()` can't make, backed by
-ClickHouse's own semantics. Run `gozzle skill` so your agent verifies changes
-automatically.
+- [`gozzle verify`](/docs/verify) — the everyday verb: prove a changed query or
+  migration `.sql` file is safe, exiting non-zero on findings (drops into a
+  pre-commit hook or CI).
+- [`verify_dedup`](/docs/verify-dedup) — prove whether a ReplacingMergeTree
+  table currently holds duplicate rows.
+- [`diagnose_query`](/docs/diagnose-query) — prove partition and primary-key
+  pruning with `EXPLAIN`, without running the query.
+- [`dry_run_migration`](/docs/dry-run-migration) — classify an `ALTER` and
+  estimate what it rewrites, without executing it.
+- [`create_local_slice`](/docs/local-slices) — copy one partition into a local
+  chDB workspace to reproduce findings offline.
 
 </Step>
 
