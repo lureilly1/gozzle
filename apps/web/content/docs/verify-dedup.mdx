@@ -22,6 +22,8 @@ Parameters:
 
 - `table` — `table` or `database.table`.
 - `sampleLimit` — how many duplicated keys to return as evidence (default `5`, max `50`).
+- `partitionId` — scope the proof to one physical `partition_id` (from
+  `inspect_table`). Use this for large tables.
 
 ## Example output
 
@@ -78,3 +80,17 @@ equal and the verdict collapses to one line.
 
 For ineligible tables, gozzle returns a clear reason instead of a misleading
 count.
+
+## Large tables
+
+The unscoped proof scans the whole table. A scan guard refuses that when a table
+is too big and instead lists its largest partitions, so you can re-run the proof
+scoped with `partitionId` (or copy a partition with
+[`create_local_slice`](/docs/local-slices)). The thresholds are configurable:
+
+| Variable | Default | Effect |
+| --- | ---: | --- |
+| `GOZZLE_DEDUP_MAX_SCAN_ROWS` | `200000000` | Refuse an unscoped scan above this many rows. Set `0` to force a full scan. |
+| `GOZZLE_DEDUP_MAX_SCAN_BYTES` | `50000000000` | Refuse an unscoped scan above this many bytes. Set `0` to force a full scan. |
+
+When scoped to a single `partitionId`, the redundant global scan is skipped.

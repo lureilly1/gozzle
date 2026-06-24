@@ -9,12 +9,12 @@ const FAQS: Array<{ q: string; tag: string; a: string }> = [
   {
     q: 'What is gozzle?',
     tag: '// basics',
-    a: 'An MCP server that gives your AI agent a faithful, read-only local slice of your ClickHouse — so it can run, test, and prove migrations and queries before anything touches production.',
+    a: 'A read-only safety harness for ClickHouse, exposed to your AI agent over MCP. The agent reasons; gozzle runs bounded, read-only checks against your real cluster and returns verdicts plus proof — so a query or migration is verified before it ships. It never executes your original query or writes anything.',
   },
   {
     q: 'Does my data ever leave my machine?',
     tag: '// privacy',
-    a: 'No. gozzle runs the local slice with chDB on your own machine. Your data, queries, and schemas stay local — nothing is uploaded or sent to us.',
+    a: 'gozzle runs locally and talks only to the ClickHouse you configure, read-only — there are no gozzle servers and no telemetry, so nothing is sent to us. Real table data leaves your cluster only if you explicitly create a local slice. (Your AI client may forward gozzle’s verdicts and small samples to its own model provider.)',
   },
   {
     q: 'Which tools does it work with?',
@@ -24,7 +24,7 @@ const FAQS: Array<{ q: string; tag: string; a: string }> = [
   {
     q: 'What does it actually catch?',
     tag: '// proof',
-    a: 'ReplacingMergeTree duplicates without FINAL, materialized views that silently drop rows, migrations that trigger multi-hour mutations, full-table scans, and aggregates broken by missing State/Merge.',
+    a: 'Queries that silently return duplicate rows (ReplacingMergeTree read without FINAL), query rewrites that change the result, migrations that trigger multi-hour part rewrites, full-table scans, and missed partition or primary-key pruning.',
   },
   {
     q: 'Is it free?',

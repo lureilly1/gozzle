@@ -19,11 +19,11 @@ const STEPS = [
 ];
 
 const CATCHES: Array<{ text: string; muted?: string }> = [
-  { text: 'Queries that read ReplacingMergeTree', muted: 'as if it were deduplicated' },
-  { text: 'Migrations that trigger multi-hour mutations' },
+  { text: 'Queries that silently return duplicate rows', muted: 'ReplacingMergeTree read without FINAL' },
+  { text: 'Migrations that trigger multi-hour part rewrites' },
   { text: 'Queries scanning far more data than expected' },
   { text: 'Missed partition or primary-key pruning' },
-  { text: 'Materialized views that silently drop rows' },
+  { text: 'Query rewrites that quietly change the result' },
 ];
 
 const REASONS = [
