@@ -40,4 +40,4 @@ jobs:
       - name: Publish canary
         run: npm publish -w @gozzle/cli --tag canary --access public
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.SECRET_KEY }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

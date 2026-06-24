@@ -7,6 +7,10 @@ coverage/
 *.tsbuildinfo
 .DS_Store
 
+# Internal planning/strategy/spec docs (not for public release)
+internal/
+WALKTHROUGH.md
+
 # Next.js / fumadocs (apps/web)
 .next/
 out/

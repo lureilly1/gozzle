@@ -1,6 +1,6 @@
 // The shared verdict contract every gozzle check reports against. `correct` is
-// reserved for EXACT methods (see VERIFICATION_MODEL.md): a sample can prove
-// `incorrect` but never `correct`.
+// reserved for EXACT methods: a sample can prove `incorrect` but never
+// `correct`.
 export type Verdict =
   | "correct"
   | "incorrect"

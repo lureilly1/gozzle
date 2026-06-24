@@ -4,6 +4,14 @@
   "private": true,
   "description": "Monorepo for gozzle — a local safety harness and developer toolkit for ClickHouse.",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lureilly1/gozzle.git"
+  },
+  "bugs": {
+    "url": "https://github.com/lureilly1/gozzle/issues"
+  },
+  "homepage": "https://github.com/lureilly1/gozzle#readme",
   "workspaces": [
     "packages/*",
     "apps/*"

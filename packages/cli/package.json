@@ -5,6 +5,28 @@
   "type": "module",
   "private": false,
   "license": "Apache-2.0",
+  "author": "Luke Reilly",
+  "homepage": "https://github.com/lureilly1/gozzle#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lureilly1/gozzle.git",
+    "directory": "packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/lureilly1/gozzle/issues"
+  },
+  "keywords": [
+    "clickhouse",
+    "mcp",
+    "model-context-protocol",
+    "sql",
+    "migration",
+    "deduplication",
+    "read-only",
+    "cli",
+    "ai-agents",
+    "database"
+  ],
   "bin": {
     "gozzle": "./dist/src/cli.js",
     "gozzle-mcp": "./dist/src/mcp/server.js"
