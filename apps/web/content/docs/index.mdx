@@ -21,7 +21,25 @@ returns rows. gozzle is a **safety harness**:
   rows, like [`verify_dedup`](/docs/verify-dedup).
 - Every call can be **recorded locally** for review ([audit log](/docs/audit-log)).
 
-## Tools
+## Two ways to use gozzle
+
+### Verify
+
+Point gozzle to a changed query or migration `.sql` file (or your branch's diff) and it proves the change
+is safe against the real cluster, **exiting non-zero on findings** — so it drops
+straight into a pre-commit hook or CI. Under the hood it routes a `SELECT` to
+query diagnosis and an `ALTER` to a migration dry-run, and adds the read-path
+proof.
+
+```bash
+gozzle verify ./queries/revenue.sql        # one file
+gozzle verify --changed                     # everything changed on this branch
+```
+
+### MCP tools
+
+Connected over MCP, these are the individual read-only checks your agent (and
+`gozzle verify`) run. Each returns a verdict plus proof:
 
 | Tool | What it does |
 | --- | --- |

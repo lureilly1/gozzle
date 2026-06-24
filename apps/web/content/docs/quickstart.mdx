@@ -94,20 +94,7 @@ eligible for:
 > Inspect the table `analytics.events` with gozzle.
 
 `inspect_table` reports the engine, sorting/partition keys, parts, and row
-counts. From there, run the check that fits what you're changing — each returns
-a verdict plus proof:
-
-- [`gozzle verify`](/docs/verify) — the everyday verb: prove a changed query or
-  migration `.sql` file is safe, exiting non-zero on findings (drops into a
-  pre-commit hook or CI).
-- [`verify_dedup`](/docs/verify-dedup) — prove whether a ReplacingMergeTree
-  table currently holds duplicate rows.
-- [`diagnose_query`](/docs/diagnose-query) — prove partition and primary-key
-  pruning with `EXPLAIN`, without running the query.
-- [`dry_run_migration`](/docs/dry-run-migration) — classify an `ALTER` and
-  estimate what it rewrites, without executing it.
-- [`create_local_slice`](/docs/local-slices) — copy one partition into a local
-  chDB workspace to reproduce findings offline.
+counts. From there, run the check that fits what you're changing.
 
 </Step>
 

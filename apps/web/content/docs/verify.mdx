@@ -1,5 +1,5 @@
 ---
-title: Verify changes
+title: Verify
 description: Prove a ClickHouse query or migration is safe against the real cluster, from the CLI or your agent
 ---
 
@@ -11,8 +11,6 @@ non-zero on findings** so it drops into any pre-commit hook or CI step.
 It uses the same read-only connection as the rest of gozzle
 ([read-only enforcement](/docs/read-only)): set `GOZZLE_CLICKHOUSE_URL` and
 credentials in the environment.
-
-## The verb
 
 ```bash
 gozzle verify ./queries/revenue.sql        # one file
@@ -46,9 +44,11 @@ gozzle verify --diff origin/main...HEAD
 
 ## gozzle.yaml
 
-A small, versioned project file tells gozzle where your SQL lives and what your
-tables are expected to be — local config, not a hosted service. gozzle walks up
-from the working directory to find it.
+`gozzle verify` works on individual files with no configuration. `gozzle.yaml` is
+an optional, versioned project file that unlocks the two things a single file
+can't express: **which files make up your SQL surface**, and **what your tables
+are supposed to guarantee**. It's local config committed to your repo — not a
+hosted service. gozzle walks up from the working directory to find it.
 
 ```yaml
 # gozzle.yaml
@@ -61,13 +61,30 @@ migrations:
 assumptions:
   events:
     unique_by: [event_id]
-    engine: ReplacingMergeTree
-  raw_events:
-    append_only: true
 ```
 
-`queries`/`migrations` globs drive `--all` (and filter `--changed`).
-`assumptions` power the read-path proof below.
+Three things it controls:
+
+- **`database`** — the default database for unqualified table names. (A
+  `GOZZLE_CLICKHOUSE_DATABASE` in the connection takes precedence.)
+- **`queries` / `migrations`** — globs that define your SQL surface. They drive
+  `gozzle verify --all` and filter `--changed` / `--diff`, so gozzle only
+  verifies files you've marked as queries or migrations.
+- **`assumptions.<table>.unique_by`** — declares the columns a table is *supposed*
+  to be unique by. This is what powers the [read-path proof](#the-read-path-proof)
+  below: gozzle checks whether queries actually honour that uniqueness against
+  live data.
+
+Why create it:
+
+- **Run `verify` over a defined SQL surface.** `gozzle verify --all` and
+  `--changed` use the globs instead of you naming files by hand — ideal in CI.
+- **Catch silent overcounting.** The read-path proof flags queries that trust a
+  uniqueness your data doesn't currently hold.
+
+Without it, `verify` still runs query diagnosis and migration dry-runs per
+file — you just don't get the `--all` / `--changed` surface or the read-path
+proof.
 
 ## The read-path proof
 
