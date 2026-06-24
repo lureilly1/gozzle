@@ -18,20 +18,24 @@ migrations:
 assumptions:
   events:
     unique_by: [event_id]
-    engine: ReplacingMergeTree
-  raw_events:
-    append_only: true
 `);
 
   assert.equal(config.database, "analytics");
   assert.deepEqual(config.queries, ["app/**/*.sql", "dashboards/*.sql"]);
   assert.deepEqual(config.migrations, ["migrations/**/*.sql"]);
   assert.deepEqual(config.assumptions.events, {
-    uniqueBy: ["event_id"],
-    appendOnly: undefined,
-    engine: "ReplacingMergeTree"
+    uniqueBy: ["event_id"]
   });
-  assert.equal(config.assumptions.raw_events.appendOnly, true);
+});
+
+test("parseProjectConfig rejects unused assumption keys", () => {
+  assert.throws(
+    () =>
+      parseProjectConfig(
+        "assumptions:\n  events:\n    unique_by: [id]\n    engine: ReplacingMergeTree"
+      ),
+    /invalid/i
+  );
 });
 
 test("parseProjectConfig defaults empty sections", () => {

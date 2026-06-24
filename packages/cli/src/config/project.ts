@@ -7,10 +7,6 @@ import { z } from "zod";
 export interface TableAssumption {
   /** Columns the table is expected to be unique by (the dedup key). */
   uniqueBy?: string[];
-  /** The table should only ever be appended to. */
-  appendOnly?: boolean;
-  /** Expected engine (e.g. ReplacingMergeTree). */
-  engine?: string;
 }
 
 export interface GozzleProjectConfig {
@@ -26,9 +22,7 @@ export interface GozzleProjectConfig {
 
 const assumptionSchema = z
   .object({
-    unique_by: z.array(z.string()).optional(),
-    append_only: z.boolean().optional(),
-    engine: z.string().optional()
+    unique_by: z.array(z.string()).optional()
   })
   .strict();
 
@@ -71,9 +65,7 @@ export function parseProjectConfig(text: string): GozzleProjectConfig {
       Object.entries(parsed.assumptions).map(([table, value]) => [
         table,
         {
-          uniqueBy: value.unique_by,
-          appendOnly: value.append_only,
-          engine: value.engine
+          uniqueBy: value.unique_by
         }
       ])
     )
