@@ -101,54 +101,34 @@ counts — and tells you whether the table can be checked with
 
 <Step>
 
-### Prove it — `verify_dedup`
+### Verify a change — `gozzle verify`
 
-For a `ReplacingMergeTree`-family table, ask:
+`gozzle verify` is the everyday verb and gozzle's leading feature: point it at a
+changed `.sql` file or your branch's diff and it proves whether the change is
+safe against the real cluster, **exiting non-zero on findings** — so it drops
+straight into a pre-commit hook or CI.
 
-> Use gozzle to verify whether `analytics.events` has duplicate rows.
+```bash
+gozzle verify ./queries/revenue.sql        # one file
+gozzle verify --changed                     # everything changed on this branch
+```
 
-gozzle counts rows by sorting key within each partition — the exact scope in
-which ClickHouse collapses rows under `FINAL` — and returns a verdict plus
-evidence:
+A `SELECT` is diagnosed with `EXPLAIN`; an `ALTER` is dry-run — the original is
+never executed. Add a [`gozzle.yaml`](/docs/verify#gozzleyaml) with your tables'
+`unique_by` assumptions to unlock the read-path proof, which catches a query
+that reads a deduplicated table without `FINAL` and can silently overcount:
 
 ```text
-x 2.4M duplicate rows currently visible without FINAL
-
-Table: analytics.events
-Engine: ReplacingMergeTree(version)
-Affected sorting keys: 184,203
-Risk: dashboards querying without FINAL may overcount
+Read-path proof:
+- [violated] analytics.events is read without FINAL and trusted as unique by
+  (event_id), but currently has 2,400,000 duplicate row(s) by sorting key —
+  this query can overcount.
 ```
 
 That is the proof moment: a claim a plain `SELECT count()` can't make, backed by
-ClickHouse's own semantics.
+ClickHouse's own semantics. Run `gozzle skill` so your agent verifies changes
+automatically.
 
 </Step>
 
 </Steps>
-
-## Verify changes in your workflow
-
-The fastest path into daily use is [`gozzle verify`](/docs/verify): point it at
-changed SQL and it proves whether the change is safe, exiting non-zero on
-findings.
-
-```bash
-gozzle verify ./queries/revenue.sql   # one file
-gozzle verify --changed               # everything changed on this branch
-```
-
-Add a [`gozzle.yaml`](/docs/verify#gozzleyaml) with your tables' uniqueness
-assumptions to unlock the read-path proof, and run `gozzle skill` so your agent
-verifies changes automatically.
-
-## Where to go next
-
-- [`dry_run_migration`](/docs/dry-run-migration) — classify an `ALTER` and
-  estimate what it will rewrite, without running it.
-- [`diagnose_query`](/docs/diagnose-query) — prove partition and primary-key
-  pruning with `EXPLAIN`.
-- [`create_local_slice`](/docs/local-slices) — copy one partition into a local
-  chDB workspace to reproduce findings offline.
-- [Read-only enforcement](/docs/read-only) and [cost guardrails](/docs/guardrails)
-  — how gozzle stays safe on a production cluster.
