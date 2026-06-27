@@ -4,7 +4,7 @@ description: Optionally record every gozzle tool call to a local file for review
 ---
 
 gozzle can keep a local, append-only record of every tool call it handles. The
-audit log is **opt-in and local** — nothing leaves your machine — so you can
+audit log is **opt-in and local**: nothing leaves your machine, so you can
 review exactly what the AI client asked gozzle to do.
 
 ## Enabling
@@ -56,5 +56,5 @@ tail -f ~/.gozzle/audit.log
 
 <Callout title="Logging never breaks a tool">
 Audit writes are best-effort. If the log path is not writable, the tool call
-still succeeds — the entry is simply skipped.
+still succeeds, the entry is simply skipped.
 </Callout>

@@ -1,10 +1,10 @@
 ---
-title: verify_dedup
+title: Verify dedup
 description: Prove whether a ReplacingMergeTree table currently holds duplicate rows
 ---
 
 `ReplacingMergeTree` (and its `Shared`/`Replicated` variants) deduplicates rows
-with the same sorting key **lazily** — during background merges, per partition.
+with the same sorting key **lazily**: during background merges, per partition.
 Until a merge runs, duplicates are still physically present, so a plain
 `SELECT count()` is misleading and `SELECT ... FINAL` hides the problem.
 
@@ -20,9 +20,9 @@ Ask your AI client:
 
 Parameters:
 
-- `table` — `table` or `database.table`.
-- `sampleLimit` — how many duplicated keys to return as evidence (default `5`, max `50`).
-- `partitionId` — scope the proof to one physical `partition_id` (from
+- `table`: `table` or `database.table`.
+- `sampleLimit`: how many duplicated keys to return as evidence (default `5`, max `50`).
+- `partitionId`: scope the proof to one physical `partition_id` (from
   `inspect_table`). Use this for large tables.
 
 ## Example output
@@ -45,7 +45,7 @@ Sample duplicated keys:
 ## Merge vs FINAL on partitioned tables
 
 Two operations remove duplicates, and on a partitioned table they remove
-**different** numbers of rows — so gozzle reports both:
+**different** numbers of rows, so gozzle reports both:
 
 - **Background merges** run *per partition*. Duplicates sharing a sorting key
   within one partition are collapsed; identical keys in different partitions are

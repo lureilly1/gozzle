@@ -26,7 +26,7 @@ returns rows. gozzle is a **safety harness**:
 ### Verify
 
 Point gozzle to a changed query or migration `.sql` file (or your branch's diff) and it proves the change
-is safe against the real cluster, **exiting non-zero on findings** — so it drops
+is safe against the real cluster, **exiting non-zero on findings**: so it drops
 straight into a pre-commit hook or CI. Under the hood it routes a `SELECT` to
 query diagnosis and an `ALTER` to a migration dry-run, and adds the read-path
 proof.
@@ -47,14 +47,14 @@ Connected over MCP, these are the individual read-only checks your agent (and
 | `connect` | Validate the connection and report read-only guardrails and account privileges. |
 | `inspect_table` | Report a table's physical layout, parts, keys, and eligible checks. |
 | [`verify_dedup`](/docs/verify-dedup) | Prove whether a ReplacingMergeTree table currently holds duplicate rows by sorting key. |
-| [`verify_equivalent`](/docs/verify) | Prove two SELECTs return the same result — exact, computed in ClickHouse. |
+| [`verify_equivalent`](/docs/verify) | Prove two SELECTs return the same result, exact, computed in ClickHouse. |
 | [`create_local_slice`](/docs/local-slices) | Copy one complete partition to a bounded, persistent local chDB workspace and compare source/local proof. |
 | [`dry_run_migration`](/docs/dry-run-migration) | Classify one ALTER statement and estimate touched rows, parts, and bytes without executing it. |
 | [`diagnose_query`](/docs/diagnose-query) | Prove partition and primary-key pruning behavior with EXPLAIN, with separate query-shape advisories. |
 
 ## Install
 
-**Project-local (recommended for teams)** — the version is committed to the repo,
+**Project-local (recommended for teams)**: the version is committed to the repo,
 so everyone (and CI) runs the same gozzle:
 
 ```bash
@@ -62,7 +62,7 @@ npm install -D @gozzle/cli
 npx gozzle init --local      # prints an MCP config that launches via npx
 ```
 
-**Global** — for a quick personal setup:
+**Global**: for a quick personal setup:
 
 ```bash
 npm install -g @gozzle/cli

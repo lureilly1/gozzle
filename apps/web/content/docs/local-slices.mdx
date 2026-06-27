@@ -24,8 +24,8 @@ Ask your AI client:
 
 Parameters:
 
-- `table` — `table` or `database.table`.
-- `partitionId` — the physical ClickHouse `partition_id`. It is required when
+- `table`: `table` or `database.table`.
+- `partitionId`: the physical ClickHouse `partition_id`. It is required when
   the table has more than one active partition.
 
 The local engine is an optional native dependency supporting Linux and macOS on
@@ -100,9 +100,9 @@ Total: 6.5 KiB in 3 workspace(s)
 
 States mean:
 
-- `valid` — a readable, supported manifest is present;
-- `corrupt` — the manifest is unreadable or does not match the supported schema;
-- `incomplete` — the workspace has no manifest, usually because creation did
+- `valid`: a readable, supported manifest is present;
+- `corrupt`: the manifest is unreadable or does not match the supported schema;
+- `incomplete`: the workspace has no manifest, usually because creation did
   not finish or another process is currently creating it.
 
 The reported size recursively includes Parquet, chDB, and manifest files. All

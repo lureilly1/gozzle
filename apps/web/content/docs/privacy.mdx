@@ -4,7 +4,7 @@ description: What gozzle reads, what stays on your machine, and what it never do
 ---
 
 gozzle is a **local** tool. It runs on your machine as a CLI and an MCP stdio
-server. There are no gozzle-operated servers, no accounts, and **no telemetry** —
+server. There are no gozzle-operated servers, no accounts, and **no telemetry**.
 gozzle never phones home, and we cannot see your schemas, queries, or data.
 
 This page describes exactly what gozzle touches. It is informational, not a legal
@@ -15,7 +15,7 @@ contract.
 gozzle connects to **one thing**: the ClickHouse instance you configure through
 `GOZZLE_CLICKHOUSE_URL` and its credentials. Every statement runs with
 [`readonly = 2`](/docs/read-only), so gozzle can read but can never write, alter,
-or drop anything — enforced at the connection layer regardless of the account's
+or drop anything, enforced at the connection layer regardless of the account's
 privileges.
 
 ## What gozzle reads
@@ -23,9 +23,9 @@ privileges.
 gozzle reads only what a check needs:
 
 - **Schema and layout metadata** from `system.tables`, `system.columns`, and
-  `system.parts` — engines, keys, partitions, row/byte counts.
+  `system.parts`: engines, keys, partitions, row/byte counts.
 - **`SHOW CREATE TABLE`** output.
-- **Bounded check results** — e.g. duplicate counts and a small sample of
+- **Bounded check results**: e.g. duplicate counts and a small sample of
   affected sorting keys for [`verify_dedup`](/docs/verify-dedup), or
   `EXPLAIN` output for [`diagnose_query`](/docs/diagnose-query).
 
@@ -38,8 +38,8 @@ never pulls your tables down wholesale.
 <Callout type="warn" title="Your AI client sees gozzle's output">
 gozzle returns its results to the AI client you connected it to (Claude Code,
 Cursor, Codex, …). That client may transmit those results to its model provider,
-exactly as it does for any other tool output. gozzle controls what it returns —
-verdicts, counts, fingerprints, and small samples — but not what your AI client
+exactly as it does for any other tool output. gozzle controls what it returns
+(verdicts, counts, fingerprints, and small samples), but not what your AI client
 does with them. Treat sample keys and table names as data your AI provider will
 see.
 </Callout>
@@ -49,11 +49,11 @@ your configured ClickHouse.
 
 ## What gozzle stores locally
 
-- **Audit log** — [opt-in](/docs/audit-log), off by default. When
+- **Audit log**: [opt-in](/docs/audit-log), off by default. When
   `GOZZLE_AUDIT_LOG` is set, gozzle appends one JSON line per tool call to that
   local file. Migration statements are recorded as a SHA-256
   fingerprint, never as raw SQL.
-- **Local slices** — only when you explicitly run
+- **Local slices**: only when you explicitly run
   [`create_local_slice`](/docs/local-slices). This is the one case where real
   table data leaves ClickHouse: one complete partition is copied to disk under
   `~/.gozzle/slices` and **persists until you clean it**.
@@ -71,12 +71,12 @@ your machine:
 
 - No telemetry, analytics, crash reporting, or usage tracking.
 - No network calls except to your configured ClickHouse.
-- No writes to your ClickHouse — ever.
+- No writes to your ClickHouse, ever.
 - No copying of table data anywhere unless you run `create_local_slice`.
 
 ## This website
 
-This documentation site collects nothing — there is no signup form, no account,
+This documentation site collects nothing, there is no signup form, no account,
 and no analytics or tracking. gozzle is open source, so you can verify all of the
 above in the source.
 

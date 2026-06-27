@@ -5,14 +5,14 @@ description: Install gozzle and run your first proof against ClickHouse in a few
 
 import { Step, Steps } from 'fumadocs-ui/components/steps';
 
-This walks you from zero to your first **verdict with proof** — gozzle finding (or
+This walks you from zero to your first **verdict with proof**: gozzle finding (or
 clearing) duplicate rows in a real ClickHouse table. It takes a few minutes.
 
 ## Prerequisites
 
 - **Node.js 22+**
 - A **ClickHouse** you can reach, with a user that can run `SELECT` (a read-only
-  user is ideal — gozzle never needs more)
+  user is ideal, gozzle never needs more)
 - An MCP host: **Claude Code**, **Cursor**, or **Codex**
 
 <Steps>
@@ -42,7 +42,7 @@ gozzle init claude    # or: cursor, codex
 ```
 
 Paste the printed block into the named file, then replace the connection values
-with your ClickHouse details. Use a **read-only** user — gozzle forces
+with your ClickHouse details. Use a **read-only** user, gozzle forces
 [`readonly=2`](/docs/read-only) on every query regardless.
 
 ```json

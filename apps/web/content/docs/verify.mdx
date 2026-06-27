@@ -32,9 +32,9 @@ gozzle verify ./q.sql --json                # machine-readable output
 
 | Code | Meaning |
 | --- | --- |
-| `0` | Clean — no failing findings (advisories alone pass without `--strict`). |
+| `0` | Clean, no failing findings (advisories alone pass without `--strict`). |
 | `1` | Findings that fail the gate: a **proven** query problem, or a migration that rewrites parts. |
-| `2` | Operational error — bad file, unknown statement, or no connection. |
+| `2` | Operational error, bad file, unknown statement, or no connection. |
 
 Because the gate is just an exit code, you can wire it into your own CI:
 
@@ -47,7 +47,7 @@ gozzle verify --diff origin/main...HEAD
 `gozzle verify` works on individual files with no configuration. `gozzle.yaml` is
 an optional, versioned project file that unlocks the two things a single file
 can't express: **which files make up your SQL surface**, and **what your tables
-are supposed to guarantee**. It's local config committed to your repo — not a
+are supposed to guarantee**. It's local config committed to your repo, not a
 hosted service. gozzle walks up from the working directory to find it.
 
 ```yaml
@@ -65,12 +65,12 @@ assumptions:
 
 Three things it controls:
 
-- **`database`** — the default database for unqualified table names. (A
+- **`database`**: the default database for unqualified table names. (A
   `GOZZLE_CLICKHOUSE_DATABASE` in the connection takes precedence.)
-- **`queries` / `migrations`** — globs that define your SQL surface. They drive
+- **`queries` / `migrations`**: globs that define your SQL surface. They drive
   `gozzle verify --all` and filter `--changed` / `--diff`, so gozzle only
   verifies files you've marked as queries or migrations.
-- **`assumptions.<table>.unique_by`** — declares the columns a table is *supposed*
+- **`assumptions.<table>.unique_by`**: declares the columns a table is *supposed*
   to be unique by. This is what powers the [read-path proof](#the-read-path-proof)
   below: gozzle checks whether queries actually honour that uniqueness against
   live data.
@@ -78,17 +78,17 @@ Three things it controls:
 Why create it:
 
 - **Run `verify` over a defined SQL surface.** `gozzle verify --all` and
-  `--changed` use the globs instead of you naming files by hand — ideal in CI.
+  `--changed` use the globs instead of you naming files by hand, ideal in CI.
 - **Catch silent overcounting.** The read-path proof flags queries that trust a
   uniqueness your data doesn't currently hold.
 
 Without it, `verify` still runs query diagnosis and migration dry-runs per
-file — you just don't get the `--all` / `--changed` surface or the read-path
+file, you just don't get the `--all` / `--changed` surface or the read-path
 proof.
 
 ## The read-path proof
 
-Duplicates inside a `ReplacingMergeTree` are expected storage behaviour — the
+Duplicates inside a `ReplacingMergeTree` are expected storage behaviour. The
 bug is a query that reads such a table **as if rows were already unique**. When a
 query reads a table you've declared `unique_by` *without* `FINAL`, gozzle checks
 whether the current data actually violates that assumption:
@@ -96,8 +96,8 @@ whether the current data actually violates that assumption:
 ```text
 Read-path proof:
 - [violated] analytics.events is read without FINAL and trusted as unique by
-  (event_id), but currently has 2,400,000 duplicate row(s) by sorting key —
-  this query can overcount.
+  (event_id), but currently has 2,400,000 duplicate row(s) by sorting key.
+  This query can overcount.
 ```
 
 A violation fails the gate. Large tables that can't be confirmed within the scan
@@ -106,7 +106,7 @@ guard are reported as `[unknown]` rather than blocking.
 ## Prove a rewrite is equivalent
 
 When you (or an agent) rewrite a query, `gozzle equivalent` proves whether the
-two return the **same result** — same multiset of rows, order-independent —
+two return the **same result**: same multiset of rows, order-independent,
 computed entirely in ClickHouse, no data copied.
 
 ```bash
@@ -123,7 +123,7 @@ queries (`rand`, `now`, …) and comparisons too large for the scan guard return
 
 Two ways, increasing reliability:
 
-**Skill** — `gozzle skill` prints an instruction telling the agent to verify with
+**Skill**: `gozzle skill` prints an instruction telling the agent to verify with
 gozzle before answering. Portable across hosts, but discretionary (agents can
 forget).
 
@@ -135,9 +135,9 @@ gozzle skill cursor     # one host: claude, cursor, or codex
 It places into CLAUDE.md (Claude Code), `.cursor/rules/gozzle.mdc` (Cursor), or
 AGENTS.md (Codex), and tells the agent to treat gozzle's verdict as ground truth.
 
-**Hook (deterministic)** — `gozzle hook` prints a Claude Code PostToolUse hook
+**Hook (deterministic)**: `gozzle hook` prints a Claude Code PostToolUse hook
 that runs after *every* file edit, so a changed `.sql` file is verified
-automatically — no reliance on the agent choosing to. On findings it blocks and
+automatically, no reliance on the agent choosing to. On findings it blocks and
 shows the verdict to the agent; non-SQL edits and setup issues are ignored.
 
 ```bash

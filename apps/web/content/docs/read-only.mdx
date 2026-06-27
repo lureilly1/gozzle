@@ -6,7 +6,7 @@ description: gozzle forces a read-only session so no statement can ever write
 gozzle is a safety harness, not a query client. To make that guarantee real
 rather than aspirational, every statement gozzle issues runs with the ClickHouse
 session setting **`readonly = 2`**. Under `readonly = 2` ClickHouse permits
-`SELECT`/`SHOW` and per-query settings, but rejects all writes and DDL — so even
+`SELECT`/`SHOW` and per-query settings, but rejects all writes and DDL, so even
 a future bug or a crafted input cannot mutate your data through gozzle.
 
 This is enforced by construction at the connection layer, independently of the
@@ -22,9 +22,9 @@ Read-only enforced by gozzle: yes (readonly=2)
 Effective readonly setting: 2
 ```
 
-`connect` also inspects the account's grants — including those inherited via
+`connect` also inspects the account's grants, including those inherited via
 roles (the default on ClickHouse Cloud, where privileges live on
-`default_role`) — and warns when the account is write-capable:
+`default_role`), and warns when the account is write-capable:
 
 ```text
 Account write-capable grants: INSERT, ALTER, TRUNCATE, OPTIMIZE, KILL QUERY
