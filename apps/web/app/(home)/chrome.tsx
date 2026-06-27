@@ -6,7 +6,7 @@ import styles from './home.module.css';
 import { C, GITHUB_URL, GOOSE, INSTALL_COMMAND, mono } from './theme';
 
 // Shared outer wrapper + nav + terminal frame so every page is exactly the same
-// size and chrome — no layout shift when navigating between home and faq.
+// size and chrome, no layout shift when navigating between home and faq.
 const SHELL_MAX_WIDTH = 1240;
 const SHELL_MIN_HEIGHT = 660;
 
@@ -193,7 +193,7 @@ export function TitleBar({ label = '~/gozzle' }: { label?: string }) {
   );
 }
 
-/** Bottom terminal bar showing the install command — the open-source CTA. */
+/** Bottom terminal bar showing the install command, the open-source CTA. */
 export function InstallBar() {
   const [copied, setCopied] = useState(false);
 

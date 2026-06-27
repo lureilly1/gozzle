@@ -15,7 +15,7 @@ const SUBHEAD =
 const STEPS = [
   'install the gozzle CLI + MCP server',
   'point it at your ClickHouse, read-only',
-  'verify a changed query or migration — get proof, not a guess',
+  'verify a changed query or migration, get proof, not a guess',
 ];
 
 const CATCHES: Array<{ text: string; muted?: string }> = [
@@ -28,7 +28,7 @@ const CATCHES: Array<{ text: string; muted?: string }> = [
 
 const REASONS = [
   'Proves changes against your real schema and data shape',
-  'Runs locally, read-only — no data leaves your machine',
+  'Runs locally, read-only, no data leaves your machine',
   'Works in your agent, your terminal, and your CI',
   'Free and open source',
 ];
@@ -190,7 +190,7 @@ function FlowDiagram() {
               letterSpacing: '.4px',
             }}
           >
-            //local slice
+            //gozzle
           </div>
           <div
             style={{
@@ -202,9 +202,9 @@ function FlowDiagram() {
               background: 'rgba(242,193,78,.05)',
             }}
           >
-            chDB
+            read-only checks
             <br />
-            faithful prod slice
+            never runs your query
           </div>
         </div>
 
@@ -257,7 +257,7 @@ function FlowDiagram() {
           letterSpacing: '.3px',
         }}
       >
-        └─ fully local and privacy first ─┘
+        └─ read-only · no data copied out ─┘
       </div>
     </div>
   );

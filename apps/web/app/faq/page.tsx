@@ -9,12 +9,12 @@ const FAQS: Array<{ q: string; tag: string; a: string }> = [
   {
     q: 'What is gozzle?',
     tag: '// basics',
-    a: 'A read-only safety harness for ClickHouse, exposed to your AI agent over MCP. The agent reasons; gozzle runs bounded, read-only checks against your real cluster and returns verdicts plus proof — so a query or migration is verified before it ships. It never executes your original query or writes anything.',
+    a: 'A read-only safety harness for ClickHouse, exposed to your AI agent over MCP. The agent reasons; gozzle runs bounded, read-only checks against your real cluster and returns verdicts plus proof, so a query or migration is verified before it ships. It never executes your original query or writes anything.',
   },
   {
     q: 'Does my data ever leave my machine?',
     tag: '// privacy',
-    a: 'gozzle runs locally and talks only to the ClickHouse you configure, read-only — there are no gozzle servers and no telemetry, so nothing is sent to us. Real table data leaves your cluster only if you explicitly create a local slice. (Your AI client may forward gozzle’s verdicts and small samples to its own model provider.)',
+    a: 'gozzle runs locally and talks only to the ClickHouse you configure, read-only. There are no gozzle servers and no telemetry, so nothing is sent to us. Real table data leaves your cluster only if you explicitly create a local slice. (Your AI client may forward gozzle’s verdicts and small samples to its own model provider.)',
   },
   {
     q: 'Which tools does it work with?',
@@ -29,7 +29,7 @@ const FAQS: Array<{ q: string; tag: string; a: string }> = [
   {
     q: 'Is it free?',
     tag: '// license',
-    a: 'Yes — gozzle is free and open source under the Apache 2.0 license. Install it from npm, read the source on GitHub, and contributions are welcome.',
+    a: 'Yes, gozzle is free and open source under the Apache 2.0 license. Install it from npm, read the source on GitHub, and contributions are welcome.',
   },
   {
     q: 'How do I get started?',
@@ -63,7 +63,7 @@ export default function FaqPage() {
                 marginBottom: 4,
               }}
             >
-              // man gozzle — frequently asked
+              // man gozzle, frequently asked
             </div>
             <h1
               className={styles.headline}
