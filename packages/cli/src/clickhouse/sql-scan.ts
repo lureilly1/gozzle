@@ -1,7 +1,7 @@
 // Quote- and paren-aware scanning shared by the query and migration validators.
 // This is security-relevant parsing (it decides what counts as a top-level
 // keyword vs. text inside a string literal), so it lives in one place and is
-// tested once — two drifting copies would be a real footgun.
+// tested once, two drifting copies would be a real footgun.
 
 /** Scan `input`, returning the index where `matches` first holds at paren depth 0
  *  outside any string/identifier literal, or -1. */

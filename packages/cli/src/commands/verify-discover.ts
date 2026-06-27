@@ -5,7 +5,7 @@ import { matchesAnyGlob, type GozzleProjectConfig } from "../config/project.js";
 
 /**
  * Filter a list of paths to the ones gozzle should verify: those matching the
- * configured query/migration globs, or — with no config — any `.sql` file.
+ * configured query/migration globs, or, with no config, any `.sql` file.
  */
 export function selectVerifiableFiles(
   files: string[],

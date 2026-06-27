@@ -30,8 +30,8 @@ export function extractSqlPaths(rawPayload: string): string[] {
 
 /**
  * The hook runtime invoked by the agent harness ("gozzle hook run"). Reads a
- * PostToolUse payload from stdin, verifies any edited .sql file, and — on
- * findings — exits 2 with the verdict on stderr so the agent must address it.
+ * PostToolUse payload from stdin, verifies any edited .sql file, and, on
+ * findings, exits 2 with the verdict on stderr so the agent must address it.
  * Anything else (non-SQL edit, no connection, gozzle's own error) exits 0: the
  * hook never disrupts the agent over gozzle's setup.
  */

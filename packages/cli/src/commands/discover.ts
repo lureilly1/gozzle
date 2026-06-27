@@ -125,7 +125,7 @@ export function formatWorkload(
   ).length;
   if (rmt > 0) {
     lines.push(
-      `${rmt} of ${workload.length} read ReplacingMergeTree tables — run \`gozzle verify\` on those to check for read-path overcounting.`
+      `${rmt} of ${workload.length} read ReplacingMergeTree tables. Run \`gozzle verify\` on those to check for read-path overcounting.`
     );
   }
   return lines.join("\n").trimEnd();

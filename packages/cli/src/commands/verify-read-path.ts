@@ -19,7 +19,7 @@ export interface ReadPathOutcome {
 /**
  * The read-path proof: for each table the query reads that is declared unique
  * (gozzle.yaml assumptions) and is read without FINAL, check whether current
- * data actually violates that uniqueness — turning "duplicates exist" into
+ * data actually violates that uniqueness, turning "duplicates exist" into
  * "this query can overcount."
  */
 export async function checkReadPaths(
@@ -65,7 +65,7 @@ export async function checkReadPaths(
         uniqueBy: assumption.uniqueBy,
         status: "violated",
         duplicateRows: dedup.finalCollapsibleRows,
-        message: `${table.table} is read without FINAL and trusted as unique by (${keys}), but currently has ${formatCount(dedup.finalCollapsibleRows)} duplicate row(s) by sorting key — this query can overcount.`
+        message: `${table.table} is read without FINAL and trusted as unique by (${keys}), but currently has ${formatCount(dedup.finalCollapsibleRows)} duplicate row(s) by sorting key. This query can overcount.`
       });
     } else {
       outcomes.push({

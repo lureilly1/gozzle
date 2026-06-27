@@ -148,10 +148,10 @@ export function buildMigrationStructured(result: DryRunMigrationResult) {
 
 function migrationStatus(classification: string): string {
   if (classification === "metadata-only") {
-    return "PASS — metadata-only, no part rewrite";
+    return "PASS: metadata-only, no part rewrite";
   }
   if (classification === "unsupported") {
-    return "UNKNOWN — could not classify; review manually";
+    return "UNKNOWN: could not classify; review manually";
   }
-  return "REVIEW — may rewrite existing data parts";
+  return "REVIEW: may rewrite existing data parts";
 }

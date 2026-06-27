@@ -14,7 +14,7 @@ export type ToolTextResult = {
 };
 
 /**
- * Connect read-only, run `body`, and always close — turning any thrown error
+ * Connect read-only, run `body`, and always close, turning any thrown error
  * into an `isError` tool result via `formatError`. Removes the connect/close/
  * try-finally boilerplate every ClickHouse-backed tool would otherwise repeat.
  */

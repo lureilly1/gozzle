@@ -100,7 +100,7 @@ export function formatEquivalentResult(result: VerifyEquivalentResult): string {
   if (result.shapeMismatch) {
     lines.push(
       "",
-      "Verdict: not equivalent — result shapes differ.",
+      "Verdict: not equivalent (result shapes differ).",
       `  left:  ${formatShape(result.shapeMismatch.left)}`,
       `  right: ${formatShape(result.shapeMismatch.right)}`
     );
@@ -108,7 +108,7 @@ export function formatEquivalentResult(result: VerifyEquivalentResult): string {
   }
 
   if (result.verdict === "correct") {
-    lines.push("", "Verdict: equivalent — both queries return the same rows.");
+    lines.push("", "Verdict: equivalent (both queries return the same rows).");
     return lines.join("\n");
   }
 
@@ -116,14 +116,14 @@ export function formatEquivalentResult(result: VerifyEquivalentResult): string {
   if (result.renamed && result.differingRows === 0) {
     lines.push(
       "",
-      "Verdict: not equivalent — rows are identical but column names differ."
+      "Verdict: not equivalent (rows are identical but column names differ)."
     );
     return lines.join("\n");
   }
 
   lines.push(
     "",
-    `Verdict: not equivalent — ${result.differingRows} differing row(s) (left-only ${result.leftOnly}, right-only ${result.rightOnly}).`
+    `Verdict: not equivalent, ${result.differingRows} differing row(s) (left-only ${result.leftOnly}, right-only ${result.rightOnly}).`
   );
   if (result.renamed) {
     lines.push("Column names also differ between the two results.");

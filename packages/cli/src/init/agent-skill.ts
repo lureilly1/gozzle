@@ -3,13 +3,13 @@ import { HOST_IDS, type HostId } from "./mcp-config.js";
 /**
  * The behavioural instruction that makes an AI agent reach for gozzle when it
  * touches ClickHouse SQL. Added to the agent's always-on rules/memory so it
- * fires automatically — the official ClickHouse skill gives advice; this makes
+ * fires automatically, the official ClickHouse skill gives advice; this makes
  * the agent prove the advice against the real cluster.
  */
 export const AGENT_INSTRUCTION = `# Verify ClickHouse changes with gozzle
 
-When you write, modify, or review ClickHouse SQL — a SELECT query or an ALTER
-migration — in this project, verify it with gozzle before giving a final answer.
+When you write, modify, or review ClickHouse SQL (a SELECT query or an ALTER
+migration) in this project, verify it with gozzle before giving a final answer.
 
 - If the gozzle MCP server is connected, call its tools: diagnose_query for a
   SELECT, dry_run_migration for an ALTER, verify_dedup for a ReplacingMergeTree

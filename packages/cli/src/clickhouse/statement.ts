@@ -6,7 +6,7 @@ export type StatementKind = "query" | "migration" | "unknown";
  * Block comments collapse to a single space so adjacent tokens never merge.
  *
  * Real `.sql` files carry header comments, but the query/migration validators
- * reject comments outright — so `verify <file>` strips them first.
+ * reject comments outright, so `verify <file>` strips them first.
  */
 export function stripSqlComments(sql: string): string {
   let out = "";

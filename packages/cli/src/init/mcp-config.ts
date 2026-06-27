@@ -200,8 +200,8 @@ export function renderInit(
   const lines: string[] = [
     `Configure gozzle as an MCP server in your AI host (${
       local
-        ? "project-local install — launched via npx"
-        : "global install — requires `npm i -g @gozzle/cli`"
+        ? "project-local install, launched via npx"
+        : "global install, requires `npm i -g @gozzle/cli`"
     }).`,
     ""
   ];

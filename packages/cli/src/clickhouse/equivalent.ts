@@ -99,7 +99,7 @@ export async function verifyEquivalent(
         ...base,
         verdict: "indeterminate",
         indeterminateReason:
-          "Queries are too large to compare exactly — add a matching filter to both, or compare over a single partition."
+          "Queries are too large to compare exactly. Add a matching filter to both, or compare over a single partition."
       };
     }
     throw error;

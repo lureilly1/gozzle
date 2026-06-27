@@ -8,7 +8,7 @@ const RESOURCE_LIMIT =
 
 /**
  * True when a ClickHouse error reflects a cost/scan guardrail tripping
- * (timeout, row/byte read limit, memory) rather than a query defect — the
+ * (timeout, row/byte read limit, memory) rather than a query defect, the
  * signal to fall back to a scoped or sampled path instead of failing outright.
  */
 export function isResourceLimitError(error: unknown): boolean {

@@ -131,12 +131,12 @@ export function buildDiagnosisStructured(result: DiagnoseQueryResult) {
 
 function queryStatus(proven: QueryFinding[], advisory: QueryFinding[]): string {
   if (proven.length > 0) {
-    return `FAIL — ${proven.length} proven pruning issue(s)`;
+    return `FAIL: ${proven.length} proven pruning issue(s)`;
   }
   if (advisory.length > 0) {
-    return `WARN — ${advisory.length} advisory finding(s), none proven`;
+    return `WARN: ${advisory.length} advisory finding(s), none proven`;
   }
-  return "PASS — no pruning problem found";
+  return "PASS: no pruning problem found";
 }
 
 function formatVerdict(
