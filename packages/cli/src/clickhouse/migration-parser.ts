@@ -4,7 +4,8 @@ import {
   findTopLevelKeyword,
   findTopLevelWords,
   maskQuoted,
-  scanTopLevel
+  scanTopLevel,
+  splitTopLevel
 } from "./sql-scan.js";
 
 export type MigrationClassification =
@@ -15,6 +16,26 @@ export type MigrationClassification =
 
 export type RewriteScope = "none" | "all" | "predicate";
 
+/** A `column = expression` pair from an UPDATE mutation. */
+export interface MigrationAssignment {
+  column: string;
+  expression: string;
+}
+
+/** The column and target type of a plain `MODIFY COLUMN <name> <type>`. */
+export interface MigrationColumnChange {
+  column: string;
+  type: string;
+}
+
+/** A DEFAULT/MATERIALIZED column expression that can be evaluated read-only. */
+export interface MigrationColumnExpression {
+  column: string;
+  type: string;
+  kind: "DEFAULT" | "MATERIALIZED";
+  expression: string;
+}
+
 export interface ParsedMigration {
   statement: string;
   table: TableIdentifier;
@@ -22,6 +43,12 @@ export interface ParsedMigration {
   classification: MigrationClassification;
   rewriteScope: RewriteScope;
   predicate?: string;
+  /** SET assignments, when the operation is an UPDATE mutation. */
+  assignments?: MigrationAssignment[];
+  /** Column + target type, when the operation is a plain MODIFY COLUMN. */
+  columnChange?: MigrationColumnChange;
+  /** Column expression, when ADD/MODIFY COLUMN carries DEFAULT/MATERIALIZED. */
+  columnExpression?: MigrationColumnExpression;
   reason: string;
   advice: string;
 }
@@ -82,7 +109,7 @@ export function parseMigrationStatement(input: string): ParsedMigration {
 
   if (/^MODIFY\s+COLUMN\b/i.test(operation)) {
     const materialized = /\bMATERIALIZED\b/i.test(operation);
-    return createResult(
+    const result = createResult(
       statement,
       table,
       operation,
@@ -91,15 +118,23 @@ export function parseMigrationStatement(input: string): ParsedMigration {
       materialized
         ? "Changing a MATERIALIZED column expression can require existing data to be rebuilt."
         : "MODIFY COLUMN can rewrite existing column data; gozzle uses the full table as an upper bound.",
-      "Validate type conversion and defaults on a local slice before running this ALTER."
+      "Review the type conversion below before running this ALTER."
     );
+    const definition = parseColumnDefinition(operation, "MODIFY");
+    return {
+      ...result,
+      ...(definition && !materialized
+        ? { columnChange: { column: definition.column, type: definition.type } }
+        : {}),
+      ...(definition?.expression ? { columnExpression: definition.expression } : {})
+    };
   }
 
   if (
     /^ADD\s+COLUMN\b/i.test(operation) &&
     /\bMATERIALIZED\b/i.test(operation)
   ) {
-    return createResult(
+    const result = createResult(
       statement,
       table,
       operation,
@@ -108,6 +143,10 @@ export function parseMigrationStatement(input: string): ParsedMigration {
       "Adding a MATERIALIZED column is metadata-only initially, but existing parts are not physically populated until materialized or merged.",
       "Dry-run MATERIALIZE COLUMN separately if existing rows must be physically populated."
     );
+    const definition = parseColumnDefinition(operation, "ADD");
+    return definition?.expression
+      ? { ...result, columnExpression: definition.expression }
+      : result;
   }
 
   if (/^(MODIFY|MATERIALIZE)\s+TTL\b/i.test(operation)) {
@@ -136,7 +175,7 @@ export function parseMigrationStatement(input: string): ParsedMigration {
 
   if (isMetadataOnly(operation)) {
     const destructive = /^(DROP|RENAME)\s+COLUMN\b/i.test(operation);
-    return createResult(
+    const result = createResult(
       statement,
       table,
       operation,
@@ -149,6 +188,12 @@ export function parseMigrationStatement(input: string): ParsedMigration {
         ? "Check dependent views and queries before applying this schema change."
         : "Review compatibility with writers and dependent views before applying it."
     );
+    const definition = /^ADD\s+COLUMN\b/i.test(operation)
+      ? parseColumnDefinition(operation, "ADD")
+      : undefined;
+    return definition?.expression
+      ? { ...result, columnExpression: definition.expression }
+      : result;
   }
 
   return unsupported(
@@ -233,7 +278,19 @@ function parsePredicateMutation(
       `${kind} predicate contains unsupported top-level ${forbiddenClause}.`
     );
   }
-  return {
+  const assignments =
+    kind === "UPDATE"
+      ? parseAssignments(operation.slice("UPDATE".length, whereIndex))
+      : [];
+  if (kind === "UPDATE" && assignments.length === 0) {
+    return unsupported(
+      statement,
+      table,
+      operation,
+      "UPDATE mutation has no parseable assignments."
+    );
+  }
+  const base = {
     ...createResult(
       statement,
       table,
@@ -245,6 +302,101 @@ function parsePredicateMutation(
     ),
     predicate
   };
+  if (kind === "UPDATE") return { ...base, assignments };
+  return base;
+}
+
+/** Parse `col = expr, col2 = expr2` (top-level commas, first top-level `=`). */
+function parseAssignments(text: string): MigrationAssignment[] {
+  return splitTopLevel(text, ",")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const eq = scanTopLevel(part, (character) => character === "=");
+      if (eq <= 0) return undefined;
+      const column = stripBackticks(part.slice(0, eq).trim());
+      const expression = part.slice(eq + 1).trim();
+      return column && expression ? { column, expression } : undefined;
+    })
+    .filter((entry): entry is MigrationAssignment => entry !== undefined);
+}
+
+const COLUMN_DEFINITION_HEADERS = {
+  ADD: /^ADD\s+COLUMN\s+(?:IF\s+NOT\s+EXISTS\s+)?(`[^`]+`|[A-Za-z_][A-Za-z0-9_]*)\s+([\s\S]+)$/i,
+  MODIFY:
+    /^MODIFY\s+COLUMN\s+(?:IF\s+EXISTS\s+)?(`[^`]+`|[A-Za-z_][A-Za-z0-9_]*)\s+([\s\S]+)$/i
+};
+
+// Clauses that can trail the type in a MODIFY COLUMN, so we keep only the type.
+const COLUMN_TYPE_TERMINATORS = [
+  "DEFAULT",
+  "MATERIALIZED",
+  "ALIAS",
+  "EPHEMERAL",
+  "CODEC",
+  "TTL",
+  "COMMENT",
+  "SETTINGS",
+  "REMOVE",
+  "AFTER",
+  "FIRST"
+];
+
+const COLUMN_EXPRESSION_TERMINATORS = [
+  "CODEC",
+  "TTL",
+  "COMMENT",
+  "SETTINGS",
+  "AFTER",
+  "FIRST"
+];
+
+function parseColumnDefinition(
+  operation: string,
+  action: keyof typeof COLUMN_DEFINITION_HEADERS
+):
+  | {
+      column: string;
+      type: string;
+      expression?: MigrationColumnExpression;
+    }
+  | undefined {
+  const match = operation.match(COLUMN_DEFINITION_HEADERS[action]);
+  if (!match) return undefined;
+  const column = stripBackticks(match[1]);
+  let type = match[2].trim();
+  const expression = parseColumnExpression(column, type);
+  const cut = COLUMN_TYPE_TERMINATORS.map((keyword) =>
+    findTopLevelKeyword(type, keyword)
+  ).filter((index) => index > 0);
+  if (cut.length > 0) type = type.slice(0, Math.min(...cut)).trim();
+  return column && type ? { column, type, expression } : undefined;
+}
+
+function parseColumnExpression(
+  column: string,
+  typeAndClauses: string
+): MigrationColumnExpression | undefined {
+  const kind = ["DEFAULT", "MATERIALIZED"].find(
+    (keyword) => findTopLevelKeyword(typeAndClauses, keyword) > 0
+  ) as MigrationColumnExpression["kind"] | undefined;
+  if (!kind) return undefined;
+  const kindIndex = findTopLevelKeyword(typeAndClauses, kind);
+  const type = typeAndClauses.slice(0, kindIndex).trim();
+  let expression = typeAndClauses.slice(kindIndex + kind.length).trim();
+  const cut = COLUMN_EXPRESSION_TERMINATORS.map((keyword) =>
+    findTopLevelKeyword(expression, keyword)
+  ).filter((index) => index > 0);
+  if (cut.length > 0) expression = expression.slice(0, Math.min(...cut)).trim();
+  return column && type && expression
+    ? { column, type, kind, expression }
+    : undefined;
+}
+
+function stripBackticks(value: string): string {
+  return value.startsWith("`") && value.endsWith("`")
+    ? value.slice(1, -1)
+    : value;
 }
 
 function createResult(

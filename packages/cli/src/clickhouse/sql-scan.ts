@@ -38,6 +38,24 @@ export function scanTopLevel(
   return -1;
 }
 
+/** Split `input` on a top-level single-character separator (paren/quote-aware). */
+export function splitTopLevel(input: string, separator: string): string[] {
+  const parts: string[] = [];
+  let start = 0;
+  for (;;) {
+    const offset = scanTopLevel(
+      input.slice(start),
+      (character) => character === separator
+    );
+    if (offset === -1) {
+      parts.push(input.slice(start));
+      return parts;
+    }
+    parts.push(input.slice(start, start + offset));
+    start += offset + 1;
+  }
+}
+
 /** Index of a top-level keyword (whole-word, case-insensitive), or -1. */
 export function findTopLevelKeyword(input: string, keyword: string): number {
   return scanTopLevel(input, (_character, index) => {

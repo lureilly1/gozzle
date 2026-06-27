@@ -24,6 +24,41 @@ test("classifies predicate UPDATE and preserves the WHERE expression", () => {
     parsed.predicate,
     "tenant_id = 42 AND status IN ('new', 'new,unread')"
   );
+  assert.deepEqual(parsed.assignments, [
+    { column: "status", expression: "if(status = 'new,unread', 'new', status)" },
+    { column: "version", expression: "version + 1" }
+  ]);
+});
+
+test("extracts plain MODIFY COLUMN target type", () => {
+  const parsed = parseMigrationStatement(
+    "ALTER TABLE events MODIFY COLUMN `status` LowCardinality(Nullable(String)) CODEC(ZSTD)"
+  );
+  assert.deepEqual(parsed.columnChange, {
+    column: "status",
+    type: "LowCardinality(Nullable(String))"
+  });
+});
+
+test("extracts ADD/MODIFY column expressions for read-only validation", () => {
+  const add = parseMigrationStatement(
+    "ALTER TABLE events ADD COLUMN day Date DEFAULT toDate(timestamp)"
+  );
+  const modify = parseMigrationStatement(
+    "ALTER TABLE events MODIFY COLUMN status String MATERIALIZED concat(prefix, '-', suffix) COMMENT 'derived'"
+  );
+  assert.deepEqual(add.columnExpression, {
+    column: "day",
+    type: "Date",
+    kind: "DEFAULT",
+    expression: "toDate(timestamp)"
+  });
+  assert.deepEqual(modify.columnExpression, {
+    column: "status",
+    type: "String",
+    kind: "MATERIALIZED",
+    expression: "concat(prefix, '-', suffix)"
+  });
 });
 
 test("recognizes mutation keywords across line breaks", () => {
@@ -62,6 +97,14 @@ test("refuses partition-scoped predicate mutations", () => {
   assert.equal(remove.classification, "unsupported");
   assert.equal(update.classification, "unsupported");
   assert.match(remove.reason, /does not yet preserve partition scope/);
+});
+
+test("refuses UPDATE mutations without parseable assignments", () => {
+  const parsed = parseMigrationStatement(
+    "ALTER TABLE events UPDATE WHERE tenant_id = 42"
+  );
+  assert.equal(parsed.classification, "unsupported");
+  assert.match(parsed.reason, /no parseable assignments/);
 });
 
 test("refuses subqueries and external-access functions in predicates", () => {

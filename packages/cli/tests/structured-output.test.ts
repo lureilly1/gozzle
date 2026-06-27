@@ -72,6 +72,7 @@ function migrationResult(
       affectedBytes: 0,
       evidence: "none"
     },
+    correctness: [],
     productionExecuted: false
   };
 }
@@ -96,6 +97,7 @@ test("buildMigrationStructured derives status from classification", () => {
   );
   const s = buildMigrationStructured(migrationResult("metadata-only"));
   assert.equal(s.table, "analytics.events");
+  assert.equal(s.correctnessStatus, "ok");
   assert.match(s.statementSha256, HEX64);
 });
 

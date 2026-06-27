@@ -4,6 +4,7 @@ import { fingerprint } from "../shared/fingerprint.js";
 import { z } from "zod";
 
 import {
+  correctnessVerdict,
   dryRunMigration,
   type DryRunMigrationResult
 } from "../clickhouse/migration.js";
@@ -41,6 +42,14 @@ export function createDryRunMigrationTool(server: McpServer): void {
           affectedBytes: z.number(),
           evidence: z.string()
         }),
+        correctnessStatus: z.enum(["ok", "warning", "error", "unknown"]),
+        correctness: z.array(
+          z.object({
+            check: z.string(),
+            status: z.enum(["ok", "warning", "error", "unknown"]),
+            message: z.string()
+          })
+        ),
         statementSha256: z.string()
       }
     },
@@ -99,6 +108,23 @@ export function formatMigrationResult(result: DryRunMigrationResult): string {
     );
   }
 
+  if (result.correctness.length > 0) {
+    lines.push(
+      "",
+      "Read-only correctness gate:",
+      `- verdict: ${correctnessVerdict(result.correctness)} (proven against current data; production ALTER not run)`
+    );
+    for (const finding of result.correctness) {
+      lines.push(`- ${finding.status}: ${finding.check}: ${finding.message}`);
+    }
+  } else {
+    lines.push(
+      "",
+      "Read-only correctness gate:",
+      "- verdict: not applicable; no expression, cast, or predicate check was inferred."
+    );
+  }
+
   lines.push(
     "",
     `Advice: ${parsed.advice}`,
@@ -111,8 +137,15 @@ export function formatMigrationResult(result: DryRunMigrationResult): string {
 
 function migrationVerdict(result: DryRunMigrationResult): string {
   const { parsed, rewrite } = result;
+  const correctness = correctnessVerdict(result.correctness);
   if (parsed.classification === "unsupported") {
     return "unsupported; no cost or safety claim was inferred.";
+  }
+  if (correctness === "error") {
+    return "read-only correctness gate found errors against current data.";
+  }
+  if (correctness === "unknown") {
+    return "read-only correctness gate could not prove every check.";
   }
   if (parsed.classification === "metadata-only") {
     return "no existing data-part rewrite expected.";
@@ -142,6 +175,8 @@ export function buildMigrationStructured(result: DryRunMigrationResult) {
     productionExecuted: false as const,
     footprint: result.footprint,
     rewrite: result.rewrite,
+    correctnessStatus: correctnessVerdict(result.correctness),
+    correctness: result.correctness,
     statementSha256: fingerprint(result.parsed.statement)
   };
 }

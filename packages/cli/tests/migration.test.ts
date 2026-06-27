@@ -33,6 +33,15 @@ class FakeMetadataClient implements ClickHouseMetadataClient {
         }
       ] as T[];
     }
+    if (query.includes("__gozzle_value")) {
+      return [
+        {
+          checked_rows: "7",
+          cast_failures: "0",
+          null_values: "0"
+        }
+      ] as T[];
+    }
     if (query.includes("FROM system.parts")) {
       return [
         {
@@ -103,8 +112,24 @@ test("metadata-only dry run reports zero physical rewrite", async () => {
   assert.match(text, /no existing data-part rewrite expected/);
 });
 
-test("MODIFY COLUMN uses table metadata as a full-table upper bound", async () => {
+test("ADD COLUMN DEFAULT validates its expression without claiming a rewrite", async () => {
   const result = await dryRunMigration(new FakeMetadataClient(), {
+    statement:
+      "ALTER TABLE analytics.events ADD COLUMN status_copy String DEFAULT status",
+    defaultDatabase: "default"
+  });
+  assert.equal(result.parsed.classification, "metadata-only");
+  assert.equal(result.rewrite.evidence, "none");
+  assert.deepEqual(
+    result.correctness.map((finding) => finding.check),
+    ["column-expression"]
+  );
+  assert.equal(result.correctness[0]?.status, "ok");
+});
+
+test("MODIFY COLUMN uses table metadata as a full-table upper bound", async () => {
+  const client = new FakeMetadataClient();
+  const result = await dryRunMigration(client, {
     statement:
       "ALTER TABLE analytics.events MODIFY COLUMN status LowCardinality(String)",
     defaultDatabase: "default"
@@ -112,6 +137,11 @@ test("MODIFY COLUMN uses table metadata as a full-table upper bound", async () =
   assert.equal(result.rewrite.evidence, "table-metadata-upper-bound");
   assert.equal(result.rewrite.affectedParts, 4);
   assert.equal(result.rewrite.affectedBytes, 2097152);
+  assert.deepEqual(result.correctness.map((finding) => finding.status), ["ok"]);
+  assert.equal(
+    client.queries.some((query) => query.includes("accurateCastOrNull")),
+    true
+  );
 });
 
 test("predicate mutation estimates matching rows and full touched parts", async () => {
@@ -126,6 +156,14 @@ test("predicate mutation estimates matching rows and full touched parts", async 
   assert.equal(result.rewrite.affectedPartRows, 500);
   assert.equal(result.rewrite.affectedParts, 2);
   assert.equal(result.rewrite.affectedBytes, 1048576);
+  assert.deepEqual(
+    result.correctness.map((finding) => finding.check),
+    ["predicate", "update-expression"]
+  );
+  assert.deepEqual(
+    result.correctness.map((finding) => finding.status),
+    ["ok", "ok"]
+  );
   const estimateQuery = client.queries.find((query) =>
     query.includes("INNER JOIN")
   );
@@ -133,6 +171,8 @@ test("predicate mutation estimates matching rows and full touched parts", async 
   assert.match(estimateQuery ?? "", /GROUP BY _part/);
   const text = formatMigrationResult(result);
   assert.match(text, /Status: REVIEW/);
+  assert.match(text, /Read-only correctness gate/);
+  assert.match(text, /proven against current data/);
   assert.match(text, /1.00 MiB/);
 });
 
