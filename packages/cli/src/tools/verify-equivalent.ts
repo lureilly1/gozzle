@@ -8,6 +8,7 @@ import {
   verifyEquivalent,
   type VerifyEquivalentResult
 } from "../clickhouse/equivalent.js";
+import { equivalentToRun } from "../planner/adapters/equivalent.js";
 import { formatValue } from "../shared/format.js";
 import { runAuditedTool } from "../shared/audit.js";
 import { withClickHouseTool } from "./with-clickhouse.js";
@@ -39,7 +40,8 @@ export function createVerifyEquivalentTool(server: McpServer): void {
         leftOnly: z.number(),
         rightOnly: z.number(),
         renamed: z.boolean(),
-        indeterminateReason: z.string().optional()
+        indeterminateReason: z.string().optional(),
+        verificationRun: z.any()
       }
     },
     async ({ left, right, sampleLimit }) =>
@@ -58,7 +60,11 @@ export function createVerifyEquivalentTool(server: McpServer): void {
                 content: [
                   { type: "text", text: formatEquivalentResult(result) }
                 ],
-                structuredContent: buildEquivalentStructured(result)
+                structuredContent: buildEquivalentStructured(result, {
+                  left,
+                  right,
+                  source: "mcp"
+                })
               };
             },
             (error) =>
@@ -68,7 +74,14 @@ export function createVerifyEquivalentTool(server: McpServer): void {
   );
 }
 
-export function buildEquivalentStructured(result: VerifyEquivalentResult) {
+export function buildEquivalentStructured(
+  result: VerifyEquivalentResult,
+  artifact?: {
+    left: string;
+    right: string;
+    source: "cli" | "mcp" | "ci" | "hook";
+  }
+) {
   return {
     verdict: result.verdict,
     method: result.method,
@@ -78,7 +91,8 @@ export function buildEquivalentStructured(result: VerifyEquivalentResult) {
     renamed: result.renamed ?? false,
     ...(result.indeterminateReason
       ? { indeterminateReason: result.indeterminateReason }
-      : {})
+      : {}),
+    ...(artifact ? { verificationRun: equivalentToRun(result, artifact) } : {})
   };
 }
 

@@ -126,7 +126,9 @@ export function parseMigrationStatement(input: string): ParsedMigration {
       ...(definition && !materialized
         ? { columnChange: { column: definition.column, type: definition.type } }
         : {}),
-      ...(definition?.expression ? { columnExpression: definition.expression } : {})
+      ...(definition?.expression
+        ? { columnExpression: definition.expression }
+        : {})
     };
   }
 

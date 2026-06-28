@@ -25,7 +25,10 @@ test("classifies predicate UPDATE and preserves the WHERE expression", () => {
     "tenant_id = 42 AND status IN ('new', 'new,unread')"
   );
   assert.deepEqual(parsed.assignments, [
-    { column: "status", expression: "if(status = 'new,unread', 'new', status)" },
+    {
+      column: "status",
+      expression: "if(status = 'new,unread', 'new', status)"
+    },
     { column: "version", expression: "version + 1" }
   ]);
 });

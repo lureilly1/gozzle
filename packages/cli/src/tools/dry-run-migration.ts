@@ -8,6 +8,7 @@ import {
   dryRunMigration,
   type DryRunMigrationResult
 } from "../clickhouse/migration.js";
+import { migrationToRun } from "../planner/adapters/migration.js";
 import { formatBytes, formatCount } from "../shared/format.js";
 import { runAuditedTool } from "../shared/audit.js";
 import { withClickHouseTool } from "./with-clickhouse.js";
@@ -50,7 +51,8 @@ export function createDryRunMigrationTool(server: McpServer): void {
             message: z.string()
           })
         ),
-        statementSha256: z.string()
+        statementSha256: z.string(),
+        verificationRun: z.any()
       }
     },
     async ({ statement }) =>
@@ -68,7 +70,7 @@ export function createDryRunMigrationTool(server: McpServer): void {
                 content: [
                   { type: "text", text: formatMigrationResult(result) }
                 ],
-                structuredContent: buildMigrationStructured(result)
+                structuredContent: buildMigrationStructured(result, "mcp")
               };
             },
             (error) =>
@@ -161,7 +163,11 @@ function migrationVerdict(result: DryRunMigrationResult): string {
   )} row(s) and ${formatBytes(rewrite.affectedBytes)}, may be rewritten.`;
 }
 
-export function buildMigrationStructured(result: DryRunMigrationResult) {
+export function buildMigrationStructured(
+  result: DryRunMigrationResult,
+  source: "cli" | "mcp" | "ci" | "hook" = "cli",
+  path?: string
+) {
   const classification = result.parsed.classification;
   return {
     status:
@@ -177,7 +183,8 @@ export function buildMigrationStructured(result: DryRunMigrationResult) {
     rewrite: result.rewrite,
     correctnessStatus: correctnessVerdict(result.correctness),
     correctness: result.correctness,
-    statementSha256: fingerprint(result.parsed.statement)
+    statementSha256: fingerprint(result.parsed.statement),
+    verificationRun: migrationToRun(result, source, path)
   };
 }
 

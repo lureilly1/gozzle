@@ -1,0 +1,54 @@
+---
+title: CI
+description: Run gozzle in pull requests and fail on ClickHouse verification findings
+---
+
+Use `gozzle verify --diff` in CI to verify ClickHouse SQL changed by a pull
+request.
+
+```yaml
+name: gozzle
+
+on:
+  pull_request:
+
+jobs:
+  verify-clickhouse:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: npm install -g @gozzle/cli
+
+      - run: gozzle verify --diff origin/main...HEAD --format github
+        env:
+          GOZZLE_CLICKHOUSE_URL: ${{ secrets.GOZZLE_CLICKHOUSE_URL }}
+          GOZZLE_CLICKHOUSE_USERNAME: ${{ secrets.GOZZLE_CLICKHOUSE_USERNAME }}
+          GOZZLE_CLICKHOUSE_PASSWORD: ${{ secrets.GOZZLE_CLICKHOUSE_PASSWORD }}
+```
+
+`--format github` prints a Markdown report suitable for GitHub Actions logs or a
+future PR comment step.
+
+For machine processing, use JSON:
+
+```bash
+gozzle verify --diff origin/main...HEAD --json
+```
+
+Exit codes:
+
+| Code | Meaning |
+| --- | --- |
+| `0` | No failing findings. |
+| `1` | Verification found blocking findings or migration review items. |
+| `2` | Operational error, unsupported input, missing files, or connection failure. |
+
+Use a dedicated read-only ClickHouse account in CI. gozzle also enforces
+`readonly = 2` and query guardrails at the connection layer.

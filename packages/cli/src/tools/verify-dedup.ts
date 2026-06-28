@@ -4,6 +4,7 @@ import { readNonNegativeInt } from "../config/env.js";
 import { z } from "zod";
 
 import { verifyDedup, type VerifyDedupResult } from "../clickhouse/dedup.js";
+import { dedupToRun } from "../planner/adapters/dedup.js";
 import { formatValue } from "../shared/format.js";
 import { runAuditedTool } from "../shared/audit.js";
 import { withClickHouseTool } from "./with-clickhouse.js";
@@ -48,7 +49,8 @@ export function createVerifyDedupTool(server: McpServer): void {
         duplicateRows: z.number(),
         finalCollapsibleRows: z.number(),
         maxCopies: z.number(),
-        reason: z.string().optional()
+        reason: z.string().optional(),
+        verificationRun: z.any()
       }
     },
     async ({ table, sampleLimit, partitionId }) =>
@@ -65,14 +67,18 @@ export function createVerifyDedupTool(server: McpServer): void {
           });
           return {
             content: [{ type: "text", text: formatDedupResult(result) }],
-            structuredContent: buildDedupStructured(result)
+            structuredContent: buildDedupStructured(result, "mcp")
           };
         }, formatDedupError)
       )
   );
 }
 
-export function buildDedupStructured(result: VerifyDedupResult) {
+export function buildDedupStructured(
+  result: VerifyDedupResult,
+  source: "cli" | "mcp" | "ci" | "hook" = "cli",
+  path?: string
+) {
   return {
     eligible: result.eligible,
     scanSkipped: result.scanSkipped ?? false,
@@ -84,7 +90,8 @@ export function buildDedupStructured(result: VerifyDedupResult) {
     duplicateRows: result.duplicateRows,
     finalCollapsibleRows: result.finalCollapsibleRows,
     maxCopies: result.maxCopies,
-    ...(result.reason ? { reason: result.reason } : {})
+    ...(result.reason ? { reason: result.reason } : {}),
+    verificationRun: dedupToRun(result, source, path)
   };
 }
 

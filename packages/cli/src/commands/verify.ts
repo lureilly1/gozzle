@@ -4,20 +4,15 @@ import { readFile } from "node:fs/promises";
 import { errorMessage } from "../shared/errors.js";
 import type { ClickHouseMetadataClient } from "../clickhouse/client.js";
 import { withClickHouseClient } from "../clickhouse/with-client.js";
-import { diagnoseQuery } from "../clickhouse/query-diagnosis.js";
-import { dryRunMigration } from "../clickhouse/migration.js";
-import {
-  detectStatementKind,
-  normalizeSqlFile,
-  type StatementKind
-} from "../clickhouse/statement.js";
+import type { StatementKind } from "../clickhouse/statement.js";
 import {
   readProjectConfig,
   type GozzleProjectConfig
 } from "../config/project.js";
-import { formatQueryDiagnosis } from "../tools/diagnose-query.js";
-import { formatMigrationResult } from "../tools/dry-run-migration.js";
 import { recordAudit } from "../shared/audit.js";
+import type { VerificationRun } from "../shared/verdict.js";
+import { verifyArtifact } from "../planner/planner.js";
+import { classifyArtifact } from "../planner/artifacts.js";
 import {
   checkReadPaths,
   formatReadPaths,
@@ -27,7 +22,11 @@ import {
   discoverConfiguredFiles,
   selectVerifiableFiles
 } from "./verify-discover.js";
-import { resolveGitFiles } from "./verify-git.js";
+import {
+  readFileAtRef,
+  resolveGitBaseRef,
+  resolveGitFiles
+} from "./verify-git.js";
 
 // Re-exported so `../src/commands/verify.js` stays the public entry point for
 // the verify command's surface (tests and callers import from here).
@@ -44,12 +43,22 @@ export interface VerifyOptions {
   json: boolean;
   changed: boolean;
   all: boolean;
+  planOnly?: boolean;
+  withSlice?: boolean;
+  before?: string;
+  after?: string;
+  format?: "text" | "json" | "github";
   diff?: string;
 }
 
 export interface FileOutcome {
   file: string;
-  kind: StatementKind | "error";
+  kind:
+    | StatementKind
+    | "query_pair"
+    | "table_assumption"
+    | "repo_diff"
+    | "error";
   label: string;
   /** Gate failure → contributes to exit code 1. */
   failing: boolean;
@@ -78,9 +87,50 @@ export function parseVerifyArgs(argv: string[]): ParsedVerifyArgs {
     const arg = argv[i];
     if (arg === "--strict") options.strict = true;
     else if (arg === "--json") options.json = true;
-    else if (arg === "--changed") options.changed = true;
+    else if (arg === "--format") {
+      const format = argv[i + 1];
+      if (!format || format.startsWith("--")) {
+        return {
+          files,
+          options,
+          error: "--format requires text, json, or github."
+        };
+      }
+      if (format !== "text" && format !== "json" && format !== "github") {
+        return {
+          files,
+          options,
+          error: "--format must be text, json, or github."
+        };
+      }
+      options.format = format;
+      if (format === "json") options.json = true;
+      i += 1;
+    } else if (arg === "--changed") options.changed = true;
     else if (arg === "--all") options.all = true;
-    else if (arg === "--diff") {
+    else if (arg === "--plan-only") options.planOnly = true;
+    else if (arg === "--with-slice") {
+      return {
+        files,
+        options,
+        error:
+          "--with-slice is not available yet. Local slice escalation is built but not wired into the planner."
+      };
+    } else if (arg === "--before") {
+      const file = argv[i + 1];
+      if (!file || file.startsWith("--")) {
+        return { files, options, error: "--before requires a SQL file." };
+      }
+      options.before = file;
+      i += 1;
+    } else if (arg === "--after") {
+      const file = argv[i + 1];
+      if (!file || file.startsWith("--")) {
+        return { files, options, error: "--after requires a SQL file." };
+      }
+      options.after = file;
+      i += 1;
+    } else if (arg === "--diff") {
       const range = argv[i + 1];
       if (!range || range.startsWith("--")) {
         return {
@@ -96,6 +146,21 @@ export function parseVerifyArgs(argv: string[]): ParsedVerifyArgs {
     } else {
       files.push(arg);
     }
+  }
+
+  if (Boolean(options.before) !== Boolean(options.after)) {
+    return {
+      files,
+      options,
+      error: "--before and --after must be supplied together."
+    };
+  }
+  if ((options.before || options.after) && files.length > 0) {
+    return {
+      files,
+      options,
+      error: "--before/--after cannot be combined with positional files."
+    };
   }
 
   return { files, options };
@@ -123,6 +188,72 @@ export async function verifyFiles(
   return outcomes;
 }
 
+async function verifyChangedFiles(
+  client: ClickHouseMetadataClient,
+  files: string[],
+  defaultDatabase: string,
+  options: VerifyOptions,
+  env: NodeJS.ProcessEnv,
+  config?: GozzleProjectConfig
+): Promise<FileOutcome[]> {
+  const baseRef = resolveGitBaseRef(options);
+  if (!baseRef) {
+    return verifyFiles(client, files, defaultDatabase, options, env, config);
+  }
+
+  const outcomes: FileOutcome[] = [];
+  for (const file of files) {
+    const current = await readFile(file, "utf8");
+    const previous = await readFileAtRef(baseRef, file);
+    if (previous === undefined) {
+      outcomes.push(
+        await verifyFile(client, file, defaultDatabase, options, env, config)
+      );
+      continue;
+    }
+
+    const currentArtifact = classifyArtifact({
+      source: "content",
+      content: current,
+      path: file
+    });
+    const previousArtifact = classifyArtifact({
+      source: "content",
+      content: previous,
+      path: file
+    });
+    if (currentArtifact.type !== "query" || previousArtifact.type !== "query") {
+      outcomes.push(
+        await verifyFile(client, file, defaultDatabase, options, env, config)
+      );
+      continue;
+    }
+
+    const run = await verifyArtifact(
+      client,
+      {
+        source: "query_pair",
+        left: previous,
+        right: current,
+        path: `${baseRef}:${file}...${file}`
+      },
+      {
+        defaultDatabase,
+        source: "cli",
+        strict: options.strict,
+        planOnly: options.planOnly,
+        allowLocalSlice: options.withSlice,
+        path: file,
+        env,
+        projectConfig: config,
+        gitBase: true
+      }
+    );
+    outcomes.push(fileOutcomeFromRun(file, run, options));
+  }
+  return outcomes;
+}
+
 async function verifyFile(
   client: ClickHouseMetadataClient,
   file: string,
@@ -145,78 +276,23 @@ async function verifyFile(
     return outcome;
   }
 
-  const statement = normalizeSqlFile(raw);
-  const kind = detectStatementKind(statement);
-
   try {
-    if (kind === "query") {
-      const result = await diagnoseQuery(client, statement, defaultDatabase);
-      const readPaths = await checkReadPaths(
-        client,
-        result,
-        config,
+    const run = await verifyArtifact(
+      client,
+      { source: "content", content: raw, path: file },
+      {
         defaultDatabase,
-        env
-      );
-      const proven = result.findings.filter((f) => f.confidence === "proven");
-      const advisory = result.findings.filter(
-        (f) => f.confidence === "advisory"
-      );
-      const violated = readPaths.some((r) => r.status === "violated");
-      const failing =
-        proven.length > 0 ||
-        violated ||
-        (options.strict && advisory.length > 0);
-      await audit(env, file, "ok", start);
-      return {
-        file,
-        kind,
-        label: "SELECT",
-        failing,
-        errored: false,
-        text: [formatQueryDiagnosis(result), formatReadPaths(readPaths)]
-          .filter(Boolean)
-          .join("\n\n"),
-        json: {
-          file,
-          kind,
-          failing,
-          findings: result.findings,
-          readPaths
-        }
-      };
-    }
-
-    if (kind === "migration") {
-      const result = await dryRunMigration(client, {
-        statement,
-        defaultDatabase
-      });
-      const classification = result.parsed.classification;
-      const failing = classification !== "metadata-only";
-      await audit(env, file, "ok", start);
-      return {
-        file,
-        kind,
-        label: "ALTER",
-        failing,
-        errored: false,
-        text: formatMigrationResult(result),
-        json: {
-          file,
-          kind,
-          failing,
-          classification,
-          rewrite: result.rewrite
-        }
-      };
-    }
-
-    const outcome = operationalError(
-      file,
-      "not a SELECT/WITH query or an ALTER statement (one statement per file)."
+        source: "cli",
+        strict: options.strict,
+        planOnly: options.planOnly,
+        allowLocalSlice: options.withSlice,
+        path: file,
+        env,
+        projectConfig: config
+      }
     );
-    await audit(env, file, "error", start);
+    const outcome = fileOutcomeFromRun(file, run, options);
+    await audit(env, file, outcome.errored ? "error" : "ok", start);
     return outcome;
   } catch (error) {
     const outcome = operationalError(file, errorMessage(error));
@@ -235,6 +311,74 @@ function operationalError(file: string, detail: string): FileOutcome {
     text: detail,
     json: { file, status: "error", error: detail }
   };
+}
+
+function fileOutcomeFromRun(
+  file: string,
+  run: VerificationRun,
+  options: VerifyOptions
+): FileOutcome {
+  return {
+    file,
+    kind: run.artifact.type === "unknown" ? "error" : run.artifact.type,
+    label: labelForRun(run),
+    failing: isFailingRun(run, options),
+    errored: run.artifact.type === "unknown",
+    text: formatVerificationRun(run),
+    json: run as unknown as Record<string, unknown>
+  };
+}
+
+function isFailingRun(run: VerificationRun, options: VerifyOptions): boolean {
+  if (run.verdict === "fail") return true;
+  if (run.artifact.type === "migration" && run.verdict === "warn") return true;
+  return Boolean(options.strict && run.verdict === "warn");
+}
+
+function labelForRun(run: VerificationRun): string {
+  if (run.artifact.type === "query") return "SELECT";
+  if (run.artifact.type === "query_pair") return "QUERY PAIR";
+  if (run.artifact.type === "migration") return "ALTER";
+  return "error";
+}
+
+function formatVerificationRun(run: VerificationRun): string {
+  const lines = [
+    `Verdict: ${run.verdict.toUpperCase()}`,
+    `Confidence: ${run.confidence}`,
+    `Checks: ${run.plan.executedChecks.join(", ") || "none"}`
+  ];
+  if (run.coverage.note) {
+    lines.push(`Coverage: ${run.coverage.note}`);
+  }
+  if (run.findings.length > 0) {
+    const readPathFindings = run.findings.filter((finding) =>
+      finding.id.startsWith("read_path_")
+    );
+    if (readPathFindings.length > 0) {
+      lines.push("", "Read-path proof:");
+      for (const finding of readPathFindings) {
+        lines.push(`- [${finding.severity}] ${finding.message}`);
+      }
+    }
+    lines.push("", "Findings:");
+    for (const finding of run.findings) {
+      lines.push(`- [${finding.severity}] ${finding.id}: ${finding.message}`);
+    }
+  }
+  if (run.limits.length > 0) {
+    lines.push("", "Limits:");
+    for (const limit of run.limits) {
+      lines.push(`- [${limit.type}] ${limit.message}`);
+    }
+  }
+  if (run.recommendations.length > 0) {
+    lines.push("", "Recommendations:");
+    for (const recommendation of run.recommendations) {
+      lines.push(`- ${recommendation}`);
+    }
+  }
+  return lines.join("\n");
 }
 
 export function aggregateExitCode(outcomes: FileOutcome[]): number {
@@ -261,6 +405,63 @@ export function renderJson(outcomes: FileOutcome[]): string {
   );
 }
 
+export function renderGithub(outcomes: FileOutcome[]): string {
+  const failing = outcomes.filter(
+    (outcome) => outcome.failing || outcome.errored
+  );
+  const verdict = failing.length > 0 ? "FAIL" : "PASS";
+  const lines = [
+    "## gozzle verification",
+    "",
+    `**Verdict:** ${verdict}`,
+    "",
+    "| File | Verdict | Findings |",
+    "| --- | --- | --- |"
+  ];
+
+  for (const outcome of outcomes) {
+    const run = outcome.json as unknown as VerificationRun;
+    const findingIds =
+      run.findings?.length > 0
+        ? run.findings.map((finding) => `\`${finding.id}\``).join(", ")
+        : outcome.errored
+          ? "`error`"
+          : "-";
+    lines.push(
+      `| \`${outcome.file}\` | ${run.verdict?.toUpperCase?.() ?? "ERROR"} | ${findingIds} |`
+    );
+  }
+
+  const detailed = outcomes
+    .map((outcome) => outcome.json as unknown as VerificationRun)
+    .filter((run) => run.findings?.length > 0 || run.limits?.length > 0);
+  if (detailed.length > 0) {
+    lines.push("", "### Findings and limits");
+    for (const run of detailed) {
+      lines.push("", `#### ${run.artifact.path ?? run.artifact.fingerprint}`);
+      for (const finding of run.findings ?? []) {
+        lines.push(
+          `- **${finding.severity.toUpperCase()}** \`${finding.id}\`: ${finding.message}`
+        );
+      }
+      for (const limit of run.limits ?? []) {
+        lines.push(`- **LIMIT** \`${limit.type}\`: ${limit.message}`);
+      }
+    }
+  }
+
+  return lines.join("\n");
+}
+
+function renderOutcomes(
+  outcomes: FileOutcome[],
+  options: VerifyOptions
+): string {
+  if (options.format === "github") return renderGithub(outcomes);
+  if (options.json || options.format === "json") return renderJson(outcomes);
+  return renderHuman(outcomes);
+}
+
 export async function runVerifyCommand(
   argv: string[],
   env: NodeJS.ProcessEnv = process.env
@@ -279,6 +480,40 @@ export async function runVerifyCommand(
     return 2;
   }
   const project = loaded?.config;
+
+  if (options.before && options.after) {
+    try {
+      const [left, right] = await Promise.all([
+        readFile(options.before, "utf8"),
+        readFile(options.after, "utf8")
+      ]);
+      return await withClickHouseClient(async (client, config) => {
+        const path = `${options.before}...${options.after}`;
+        const run = await verifyArtifact(
+          client,
+          { source: "query_pair", left, right, path },
+          {
+            defaultDatabase: config.database ?? project?.database ?? "default",
+            source: "cli",
+            strict: options.strict,
+            planOnly: options.planOnly,
+            allowLocalSlice: options.withSlice,
+            path,
+            env,
+            projectConfig: project
+          }
+        );
+        const outcome = fileOutcomeFromRun(path, run, options);
+        console.log(renderOutcomes([outcome], options));
+        return aggregateExitCode([outcome]);
+      }, env);
+    } catch (pairError) {
+      console.error(
+        `gozzle verify could not compare query files.\n\n${errorMessage(pairError)}`
+      );
+      return 2;
+    }
+  }
 
   let targetFiles = argFiles;
   if (options.all) {
@@ -321,15 +556,26 @@ export async function runVerifyCommand(
 
   try {
     return await withClickHouseClient(async (client, config) => {
-      const outcomes = await verifyFiles(
-        client,
-        targetFiles,
-        config.database ?? project?.database ?? "default",
-        options,
-        env,
-        project
-      );
-      console.log(options.json ? renderJson(outcomes) : renderHuman(outcomes));
+      const defaultDatabase = config.database ?? project?.database ?? "default";
+      const outcomes =
+        options.changed || options.diff
+          ? await verifyChangedFiles(
+              client,
+              targetFiles,
+              defaultDatabase,
+              options,
+              env,
+              project
+            )
+          : await verifyFiles(
+              client,
+              targetFiles,
+              defaultDatabase,
+              options,
+              env,
+              project
+            );
+      console.log(renderOutcomes(outcomes, options));
       return aggregateExitCode(outcomes);
     }, env);
   } catch (runError) {

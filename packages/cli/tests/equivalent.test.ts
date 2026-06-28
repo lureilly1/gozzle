@@ -180,6 +180,23 @@ test("buildEquivalentStructured exposes the contract fields", () => {
   assert.equal(s.renamed, false);
 });
 
+test("buildEquivalentStructured can include a verification run", () => {
+  const s = buildEquivalentStructured(
+    {
+      check: "verify_equivalent",
+      verdict: "correct",
+      method: "exact-source",
+      differingRows: 0,
+      leftOnly: 0,
+      rightOnly: 0,
+      sample: []
+    },
+    { left: "SELECT 1", right: "SELECT 1", source: "mcp" }
+  );
+  assert.equal(s.verificationRun?.artifact.type, "query_pair");
+  assert.equal(s.verificationRun?.verdict, "pass");
+});
+
 test("parseEquivalentArgs needs two files; runEquivalentCommand guards usage", async () => {
   assert.deepEqual(parseEquivalentArgs(["a.sql", "b.sql"]).files, [
     "a.sql",

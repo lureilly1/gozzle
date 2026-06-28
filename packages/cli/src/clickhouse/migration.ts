@@ -64,7 +64,9 @@ export function correctnessVerdict(
   findings: CorrectnessFinding[]
 ): CorrectnessStatus {
   const order: CorrectnessStatus[] = ["error", "warning", "unknown", "ok"];
-  return order.find((status) => findings.some((f) => f.status === status)) ?? "ok";
+  return (
+    order.find((status) => findings.some((f) => f.status === status)) ?? "ok"
+  );
 }
 
 interface PredicateEstimateRow {
@@ -166,7 +168,12 @@ async function checkMigrationCorrectness(
 
   if (parsed.columnChange) {
     findings.push(
-      await checkColumnChange(client, identifier, inspection, parsed.columnChange)
+      await checkColumnChange(
+        client,
+        identifier,
+        inspection,
+        parsed.columnChange
+      )
     );
   }
 
@@ -184,7 +191,9 @@ async function checkAssignment(
   assignment: MigrationAssignment,
   parsed: ParsedMigration
 ): Promise<CorrectnessFinding> {
-  const column = inspection.columns.find((entry) => entry.name === assignment.column);
+  const column = inspection.columns.find(
+    (entry) => entry.name === assignment.column
+  );
   if (!column) {
     return {
       check: "update-expression",
@@ -218,7 +227,9 @@ async function checkColumnChange(
   inspection: TableInspection,
   columnChange: NonNullable<ParsedMigration["columnChange"]>
 ): Promise<CorrectnessFinding> {
-  const column = inspection.columns.find((entry) => entry.name === columnChange.column);
+  const column = inspection.columns.find(
+    (entry) => entry.name === columnChange.column
+  );
   if (!column) {
     return {
       check: "cast-safety",

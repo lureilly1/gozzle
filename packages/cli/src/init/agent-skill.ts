@@ -11,12 +11,15 @@ export const AGENT_INSTRUCTION = `# Verify ClickHouse changes with gozzle
 When you write, modify, or review ClickHouse SQL (a SELECT query or an ALTER
 migration) in this project, verify it with gozzle before giving a final answer.
 
-- If the gozzle MCP server is connected, call its tools: diagnose_query for a
-  SELECT, dry_run_migration for an ALTER, verify_dedup for a ReplacingMergeTree
-  table. Otherwise run \`gozzle verify <file>\` (or \`gozzle verify --changed\`)
-  in the terminal.
+- If the gozzle MCP server is connected, call verify_artifact first for SQL
+  changes. Use focused tools such as diagnose_query, dry_run_migration,
+  verify_dedup, and verify_equivalent only when you need deeper context after
+  the planner verdict. Otherwise run \`gozzle verify <file>\` (or
+  \`gozzle verify --changed\`) in the terminal.
 - Treat gozzle's verdict as ground truth. Do not claim that a query prunes, that
   a migration is cheap, or that a table is deduplicated unless gozzle proves it.
+- Report exact proof, bounded checks, warnings, unsupported checks, and limits
+  separately. Never collapse a partial or advisory result into “safe.”
 - If gozzle reports a read-path violation (a query that trusts uniqueness the
   current data breaks), treat it as a correctness bug: surface it and propose a
   fix using the table's actual ORDER BY / PARTITION BY keys.

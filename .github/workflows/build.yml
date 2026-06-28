@@ -23,9 +23,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Format check
+        run: npm run format:check
+
+      - name: Lint
+        run: npm run lint
+
       - name: Build
         run: npm run build
 
       - name: Test
         run: npm test
 
+      - name: MCP smoke
+        run: npm run smoke:mcp -w @gozzle/cli

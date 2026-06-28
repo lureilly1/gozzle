@@ -10,11 +10,14 @@ import {
   aggregateExitCode,
   discoverConfiguredFiles,
   parseVerifyArgs,
+  renderGithub,
   runVerifyCommand,
   selectVerifiableFiles,
-  verifyFiles
+  verifyFiles,
+  type FileOutcome
 } from "../src/commands/verify.js";
 import type { GozzleProjectConfig } from "../src/config/project.js";
+import { resolveGitBaseRef } from "../src/commands/verify-git.js";
 
 class FakeMetadataClient implements ClickHouseMetadataClient {
   constructor(private readonly responses: Record<string, unknown[]>) {}
@@ -116,9 +119,109 @@ test("parseVerifyArgs handles --changed and --diff <range>", () => {
   );
 });
 
+test("resolveGitBaseRef derives the comparison base", () => {
+  assert.equal(
+    resolveGitBaseRef({
+      strict: false,
+      json: false,
+      changed: true,
+      all: false
+    }),
+    "HEAD"
+  );
+  assert.equal(
+    resolveGitBaseRef({
+      strict: false,
+      json: false,
+      changed: false,
+      all: false,
+      diff: "origin/main...HEAD"
+    }),
+    "origin/main"
+  );
+  assert.equal(
+    resolveGitBaseRef({
+      strict: false,
+      json: false,
+      changed: false,
+      all: false,
+      diff: "main..feature"
+    }),
+    "main"
+  );
+});
+
 test("parseVerifyArgs handles --all", () => {
   assert.equal(parseVerifyArgs(["--all"]).options.all, true);
   assert.equal(parseVerifyArgs([]).options.all, false);
+});
+
+test("parseVerifyArgs handles planner flags and query pairs", () => {
+  const parsed = parseVerifyArgs([
+    "--before",
+    "old.sql",
+    "--after",
+    "new.sql",
+    "--plan-only"
+  ]);
+  assert.equal(parsed.options.before, "old.sql");
+  assert.equal(parsed.options.after, "new.sql");
+  assert.equal(parsed.options.planOnly, true);
+  assert.match(
+    parseVerifyArgs(["--with-slice"]).error ?? "",
+    /not available yet/
+  );
+  assert.match(
+    parseVerifyArgs(["--before", "old.sql"]).error ?? "",
+    /--before and --after/
+  );
+  assert.match(
+    parseVerifyArgs(["--before", "old.sql", "--after", "new.sql", "x.sql"])
+      .error ?? "",
+    /cannot be combined/
+  );
+});
+
+test("parseVerifyArgs handles github format", () => {
+  assert.equal(
+    parseVerifyArgs(["--diff", "origin/main...HEAD", "--format", "github"])
+      .options.format,
+    "github"
+  );
+  assert.match(parseVerifyArgs(["--format"]).error ?? "", /requires/);
+  assert.match(parseVerifyArgs(["--format", "xml"]).error ?? "", /text, json/);
+});
+
+test("renderGithub emits a PR-friendly markdown summary", () => {
+  const markdown = renderGithub([
+    {
+      file: "queries/revenue.sql",
+      kind: "query_pair",
+      label: "QUERY PAIR",
+      failing: true,
+      errored: false,
+      text: "",
+      json: {
+        artifact: {
+          type: "query_pair",
+          path: "queries/revenue.sql",
+          fingerprint: "abc"
+        },
+        verdict: "fail",
+        findings: [
+          {
+            id: "query_not_equivalent",
+            severity: "error",
+            message: "Rows changed."
+          }
+        ],
+        limits: []
+      }
+    } as FileOutcome
+  ]);
+  assert.match(markdown, /## gozzle verification/);
+  assert.match(markdown, /\*\*Verdict:\*\* FAIL/);
+  assert.match(markdown, /`query_not_equivalent`/);
 });
 
 test("discoverConfiguredFiles walks the tree and matches config globs", async () => {
@@ -250,6 +353,8 @@ test("a metadata-only migration passes (exit 0)", async () => {
       );
       assert.equal(outcomes[0].kind, "migration");
       assert.equal(outcomes[0].failing, false);
+      assert.equal(outcomes[0].json.artifact?.type, "migration");
+      assert.equal(outcomes[0].json.verdict, "pass");
       assert.equal(aggregateExitCode(outcomes), 0);
     }
   );

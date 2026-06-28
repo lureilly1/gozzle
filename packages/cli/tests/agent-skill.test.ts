@@ -26,5 +26,7 @@ test("the instruction tells the agent to treat gozzle as ground truth and that i
   );
   assert.match(AGENT_INSTRUCTION, /ground truth/i);
   assert.match(AGENT_INSTRUCTION, /read-only/i);
+  assert.match(AGENT_INSTRUCTION, /verify_artifact first/i);
+  assert.match(AGENT_INSTRUCTION, /unsupported checks, and limits/i);
   assert.match(AGENT_INSTRUCTION, /read-path violation/i);
 });

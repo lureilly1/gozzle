@@ -3,7 +3,7 @@ title: Read-only enforcement
 description: gozzle forces a read-only session so no statement can ever write
 ---
 
-gozzle is a safety harness, not a query client. To make that guarantee real
+gozzle is a verification layer, not a query client. To make that guarantee real
 rather than aspirational, every statement gozzle issues runs with the ClickHouse
 session setting **`readonly = 2`**. Under `readonly = 2` ClickHouse permits
 `SELECT`/`SHOW` and per-query settings, but rejects all writes and DDL, so even

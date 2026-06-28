@@ -1,0 +1,90 @@
+---
+title: Verification planner
+description: How gozzle classifies artifacts, selects checks, and reports evidence
+---
+
+The planner is the main gozzle verification path. A caller submits an artifact,
+and gozzle decides which safe checks can produce evidence.
+
+```text
+artifact -> classify -> plan -> execute checks -> evidence -> verdict
+```
+
+The primary CLI entry is `gozzle verify`. The primary MCP entry is
+`verify_artifact`.
+
+## Artifacts
+
+The first planner version supports:
+
+- `query`: one `SELECT` or `WITH ... SELECT`.
+- `query_pair`: before/after queries, usually from `--before/--after` or a git
+  diff.
+- `migration`: one `ALTER TABLE` statement.
+- `unknown`: anything else, returned as indeterminate with an unsupported-syntax
+  limit.
+
+Files are normalized by stripping SQL comments and a trailing semicolon before
+classification.
+
+## Strategies
+
+gozzle prefers the strongest safe strategy available:
+
+| Strategy | Used for | Evidence |
+| --- | --- | --- |
+| `static_parse` | Artifact classification and query-shape advisories | Advisory |
+| `metadata_only` | Table footprint and rewrite estimates | Metadata |
+| `production_explain` | Query pruning and plan diagnosis | EXPLAIN |
+| `production_bounded_probe` | Migration predicates, casts, assignments, expressions | Bounded |
+| `production_exact` | Query equivalence and dedup proof when inside guardrails | Exact |
+| `local_slice_exact` | Future escalation for expensive/offline proof | Sampled or exact within slice |
+| `local_slice_simulation` | Future migration shadow execution | Slice-scoped |
+
+Production checks are read-only. gozzle does not execute production mutations or
+arbitrary write SQL.
+
+## Verdicts
+
+Every planner run returns the same top-level verdict vocabulary:
+
+| Verdict | Meaning |
+| --- | --- |
+| `pass` | No configured blocking issue was found. |
+| `fail` | A blocking correctness or gate issue was found. |
+| `warn` | A non-blocking risk or review item was found. |
+| `indeterminate` | gozzle could not produce enough evidence to pass or fail. |
+
+The verdict is only meaningful together with the evidence and limits. A `pass`
+from exact equivalence is stronger than a `pass` from metadata-only inspection.
+
+## Evidence levels
+
+| Level | Meaning |
+| --- | --- |
+| `exact` | Proven against the relevant checked data with exact logic. |
+| `bounded` | Proven inside an explicit current-data scope or probe. |
+| `metadata` | Inferred from ClickHouse metadata such as table, column, or part state. |
+| `explain` | Inferred from `EXPLAIN`, useful for plan shape but not result correctness. |
+| `sampled` | Based on a sample or local slice scope. |
+| `advisory` | Static or heuristic guidance, not proof. |
+
+Reports keep these levels attached to findings so an agent cannot turn advisory
+evidence into a proof claim.
+
+## Local slices
+
+Local slices are not the default planner path. The default gate is production
+read-only because production has the real schema, part layout, table state, and
+current data.
+
+Slices are reserved for deeper/offline modes, such as expensive equivalence or
+future migration shadow execution. Slice findings must stay labeled as scoped or
+sampled unless the scope exactly matches the claim being made.
+
+## Plan-only mode
+
+`gozzle verify --plan-only` classifies the artifact and reports which checks and
+strategies would be selected without querying ClickHouse.
+
+Use this to inspect planner behavior, not to make a correctness claim.

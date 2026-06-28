@@ -47,11 +47,20 @@ jobs:
       - name: Set version
         run: npm version "${{ steps.version.outputs.value }}" --no-git-tag-version --allow-same-version -w @gozzle/cli
 
+      - name: Format check
+        run: npm run format:check
+
+      - name: Lint
+        run: npm run lint
+
       - name: Build
         run: npm run build -w @gozzle/cli
 
       - name: Test
         run: npm test -w @gozzle/cli
+
+      - name: MCP smoke
+        run: npm run smoke:mcp -w @gozzle/cli
 
       - name: Publish latest
         run: npm publish -w @gozzle/cli --tag latest --access public

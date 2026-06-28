@@ -1,7 +1,7 @@
 {
   "name": "@gozzle/cli",
   "version": "0.1.5",
-  "description": "A local safety harness and developer toolkit for ClickHouse.",
+  "description": "Agent verification layer for ClickHouse changes.",
   "type": "module",
   "private": false,
   "license": "Apache-2.0",

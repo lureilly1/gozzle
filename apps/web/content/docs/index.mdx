@@ -1,11 +1,12 @@
 ---
 title: Introduction
-description: A local safety harness and developer toolkit for ClickHouse
+description: Agent verification layer for ClickHouse changes
 ---
 
-**gozzle** is a local safety harness for ClickHouse, exposed to your AI client
-over [MCP](https://modelcontextprotocol.io). The AI reasons; gozzle runs bounded
-checks and returns **verdicts plus proof**.
+**gozzle** is an agent verification layer for ClickHouse changes, exposed to
+your AI client over [MCP](https://modelcontextprotocol.io). The AI writes or
+edits SQL; gozzle runs bounded, read-only checks against the real cluster and
+returns **verdicts plus proof**.
 
 gozzle ships as `@gozzle/cli`, which provides a `gozzle` CLI and a `gozzle-mcp`
 stdio server.
@@ -13,7 +14,7 @@ stdio server.
 ## How it differs from the official ClickHouse MCP
 
 The official ClickHouse MCP is a query gateway: it lets the model run SELECTs and
-returns rows. gozzle is a **safety harness**:
+returns rows. gozzle is a **verification layer**:
 
 - Every query runs **read-only by construction** ([read-only enforcement](/docs/read-only)).
 - Every query is **bounded** so the model can't trigger a runaway ([cost & row guardrails](/docs/guardrails)).

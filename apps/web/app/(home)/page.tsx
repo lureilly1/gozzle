@@ -5,12 +5,12 @@ import styles from './home.module.css';
 import { C, GITHUB_URL } from './theme';
 import { InstallBar, PageShell } from './chrome';
 
-const HEADLINE = 'Your AI agent says it’s fine. gozzle proves it.';
+const HEADLINE = 'Your AI changed ClickHouse SQL. gozzle proves whether it is safe.';
 
 const SUBHEAD =
-  'gozzle is a read-only test harness for ClickHouse queries and migrations. It ' +
-  'runs locally against your real schema and data shape, proving whether a change ' +
-  'is safe before your agent, PR, or migration ships it.';
+  'gozzle is an agent verification layer for ClickHouse queries and migrations. It ' +
+  'runs bounded, read-only checks against your real schema and current data, catching ' +
+  'duplicate reads, bad rewrites, unsafe casts, and mutation blast radius before they ship.';
 
 const STEPS = [
   'install the gozzle CLI + MCP server',
@@ -231,7 +231,7 @@ function FlowDiagram() {
                 color: C.green,
               }}
             >
-              <span style={{ fontWeight: 700 }}>✓</span> verified correct
+              <span style={{ fontWeight: 700 }}>✓</span> proof returned
             </div>
             <div
               style={{

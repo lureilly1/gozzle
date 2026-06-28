@@ -9,7 +9,7 @@ const FAQS: Array<{ q: string; tag: string; a: string }> = [
   {
     q: 'What is gozzle?',
     tag: '// basics',
-    a: 'A read-only safety harness for ClickHouse, exposed to your AI agent over MCP. The agent reasons; gozzle runs bounded, read-only checks against your real cluster and returns verdicts plus proof, so a query or migration is verified before it ships. It never executes your original query or writes anything.',
+    a: 'An agent verification layer for ClickHouse changes, exposed to your AI agent over MCP. The agent writes or edits SQL; gozzle runs bounded, read-only checks against your real cluster and returns verdicts plus proof, so a query or migration is reviewed before it ships. It never executes your original query or writes anything.',
   },
   {
     q: 'Does my data ever leave my machine?',

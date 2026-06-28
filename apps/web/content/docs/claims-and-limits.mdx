@@ -1,0 +1,120 @@
+---
+title: Claims and limits
+description: What gozzle can prove, what it can check, and what remains uncertain
+---
+
+gozzle is useful because it is conservative. It should say exactly what it
+proved, what it checked, and what it could not know.
+
+## What “pass” means
+
+`pass` means no configured blocking issue was found by the checks that ran.
+
+It does not mean every possible ClickHouse risk has been eliminated. Read the
+run's `confidence`, `confidenceByCategory`, `coverage`, `findings`, and `limits`
+before turning a pass into a shipping claim.
+
+Examples:
+
+- Query equivalence pass: exact multiset comparison found no row difference in
+  the checked scope.
+- Migration metadata pass: no current data-part rewrite was inferred.
+- Migration correctness pass: generated read-only probes validated inferred
+  casts, predicates, assignments, or expressions against current data.
+
+Those are different claims.
+
+## Evidence levels
+
+| Level | Appropriate claim |
+| --- | --- |
+| `exact` | Proven against checked data with exact logic. |
+| `bounded` | Proven inside the stated probe or scope. |
+| `metadata` | Inferred from current ClickHouse metadata. |
+| `explain` | The plan indicates this behavior. |
+| `sampled` | Ran on a sample or local slice; not a full-table proof. |
+| `advisory` | Heuristic or static guidance only. |
+
+Agents and CI reports should preserve these labels. A sampled or advisory result
+must not be summarized as “migration correct” or “query safe.”
+
+## Migration dry-runs
+
+`dry_run_migration` and planner migration checks do not execute the production
+`ALTER`.
+
+They can report:
+
+- whether the statement is supported by gozzle's parser;
+- metadata-only vs part-rewriting classification;
+- current table footprint;
+- estimated rows, parts, and bytes that may be rewritten;
+- read-only predicate validation;
+- read-only UPDATE assignment validation;
+- current-value cast validation for `MODIFY COLUMN`;
+- default or materialized expression validation.
+
+They do not prove:
+
+- lock duration;
+- merge timing;
+- replication lag;
+- future inserts;
+- cluster saturation;
+- operational scheduling safety;
+- arbitrary unsupported ALTER behavior.
+
+If future shadow execution is added through local slices, that verdict must say
+it ran on a slice and state the slice scope.
+
+## Query diagnosis
+
+`diagnose_query` uses `EXPLAIN` and static query-shape checks. It does not run
+the original query.
+
+It can prove plan facts such as missing pruning in the returned plan. It cannot
+prove final latency, memory usage, cache behavior, join explosion in production,
+or result correctness.
+
+Use query equivalence for result correctness.
+
+## Query equivalence
+
+Query equivalence compares two result sets with exact ClickHouse logic. It is
+the strongest current check for query rewrites.
+
+It can still return `indeterminate` when:
+
+- a query is non-deterministic;
+- ClickHouse rejects the comparison;
+- guardrails abort the check;
+- the query is not a supported SELECT/WITH statement.
+
+Indeterminate is not pass.
+
+## Read-path proof
+
+Read-path proof checks whether a query reads a table without `FINAL` while
+trusting a configured uniqueness assumption that current data violates.
+
+It proves the current-data condition it checked. It does not prove future
+ingestion will preserve uniqueness.
+
+## Local slices
+
+Local slices contain scoped production data copied to a local engine. They are
+for deeper or offline verification, not the default correctness gate.
+
+A slice run should be summarized as:
+
+```text
+ran on a scoped local copy
+```
+
+not:
+
+```text
+full production proof
+```
+
+unless the slice truly covers the full claim.

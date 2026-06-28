@@ -4,6 +4,8 @@ import test from "node:test";
 import { buildDedupStructured } from "../src/tools/verify-dedup.js";
 import { buildMigrationStructured } from "../src/tools/dry-run-migration.js";
 import { buildDiagnosisStructured } from "../src/tools/diagnose-query.js";
+import { equivalentToRun } from "../src/planner/adapters/equivalent.js";
+import { migrationToRun } from "../src/planner/adapters/migration.js";
 import type { VerifyDedupResult } from "../src/clickhouse/dedup.js";
 import type { DryRunMigrationResult } from "../src/clickhouse/migration.js";
 import type {
@@ -38,6 +40,8 @@ test("buildDedupStructured maps the result and defaults scanSkipped", () => {
   assert.equal(s.scanSkipped, false);
   assert.equal(s.duplicateRows, 3);
   assert.equal(s.finalCollapsibleRows, 3);
+  assert.equal(s.verificationRun.artifact.type, "table_assumption");
+  assert.equal(s.verificationRun.verdict, "fail");
   assert.ok(!("reason" in s));
 });
 
@@ -47,6 +51,7 @@ test("buildDedupStructured includes reason and scanSkipped when present", () => 
   );
   assert.equal(s.scanSkipped, true);
   assert.equal(s.reason, "table too large");
+  assert.equal(s.verificationRun.verdict, "indeterminate");
 });
 
 function migrationResult(
@@ -99,6 +104,80 @@ test("buildMigrationStructured derives status from classification", () => {
   assert.equal(s.table, "analytics.events");
   assert.equal(s.correctnessStatus, "ok");
   assert.match(s.statementSha256, HEX64);
+  assert.equal(s.verificationRun.artifact.type, "migration");
+  assert.equal(s.verificationRun.verdict, "pass");
+});
+
+test("migrationToRun separates rewrite warning from correctness failure", () => {
+  const warning = migrationToRun(
+    {
+      ...migrationResult("part-rewriting"),
+      parsed: {
+        ...migrationResult("part-rewriting").parsed,
+        rewriteScope: "all"
+      },
+      rewrite: {
+        matchingRows: 10,
+        affectedPartRows: 10,
+        affectedParts: 1,
+        affectedBytes: 100,
+        evidence: "table-metadata-upper-bound"
+      },
+      correctness: [{ check: "cast-safety", status: "ok", message: "ok" }]
+    },
+    "cli"
+  );
+  assert.equal(warning.verdict, "warn");
+  assert.equal(
+    warning.findings.some(
+      (finding) => finding.id === "migration_rewrite_footprint"
+    ),
+    true
+  );
+
+  const failed = migrationToRun(
+    {
+      ...migrationResult("part-rewriting"),
+      correctness: [
+        { check: "cast-safety", status: "error", message: "bad cast" }
+      ]
+    },
+    "cli"
+  );
+  assert.equal(failed.verdict, "fail");
+  assert.equal(failed.findings[0].blocking, true);
+});
+
+test("equivalentToRun maps exact query comparison into verification run", () => {
+  const pass = equivalentToRun(
+    {
+      check: "verify_equivalent",
+      verdict: "correct",
+      method: "exact-source",
+      differingRows: 0,
+      leftOnly: 0,
+      rightOnly: 0,
+      sample: []
+    },
+    { left: "SELECT 1", right: "SELECT 1", source: "cli" }
+  );
+  assert.equal(pass.verdict, "pass");
+  assert.equal(pass.confidence, "exact");
+
+  const fail = equivalentToRun(
+    {
+      check: "verify_equivalent",
+      verdict: "incorrect",
+      method: "exact-source",
+      differingRows: 3,
+      leftOnly: 2,
+      rightOnly: 1,
+      sample: []
+    },
+    { left: "SELECT 1", right: "SELECT 2", source: "cli" }
+  );
+  assert.equal(fail.verdict, "fail");
+  assert.equal(fail.findings[0].id, "query_not_equivalent");
 });
 
 function diagnosisResult(findings: QueryFinding[]): DiagnoseQueryResult {
@@ -148,4 +227,6 @@ test("buildDiagnosisStructured derives status and passes through tables/findings
   assert.equal(s.findings.length, 2);
   assert.equal(s.tables[0].table, "analytics.events");
   assert.match(s.queryFingerprint, HEX64);
+  assert.equal(s.verificationRun.artifact.type, "query");
+  assert.equal(s.verificationRun.verdict, "fail");
 });

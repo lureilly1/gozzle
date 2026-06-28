@@ -1,8 +1,10 @@
 # gozzle
 
-A safety harness for your ClickHouse, inside your own AI.
+Agent verification layer for ClickHouse changes.
 
-gozzle is a local developer toolkit for ClickHouse. The AI reasons; gozzle runs checks and produces proof.
+Your AI changed ClickHouse SQL. gozzle proves what can be proven, checks what
+can be checked, and clearly labels what remains uncertain. It runs locally,
+read-only, against your real ClickHouse schema and current data.
 
 ## Install
 
@@ -109,6 +111,19 @@ read-only and joins matching `_part` values to `system.parts`. The result shows
 both the matching row count and the complete compressed footprint of the parts
 that ClickHouse may rewrite. Full-table operations use current table metadata
 as a conservative upper bound.
+
+When the ALTER contains data-facing logic, gozzle also runs a read-only
+correctness gate against current data:
+
+- UPDATE assignments are evaluated over matching rows and cast to the target
+  column's current type.
+- MODIFY COLUMN checks whether current values can be cast to the proposed type.
+- DEFAULT and MATERIALIZED column expressions are evaluated and cast to their
+  declared type.
+
+These checks are reported as proven against current data. They do not execute
+the production ALTER, prove future data, or predict lock duration, replication
+lag, or merge timing.
 
 The first implementation intentionally refuses compound ALTERs, `ON CLUSTER`,
 partition operations, quoted table identifiers, mutation subqueries,

@@ -2,7 +2,7 @@ import type { ClickHouseMetadataClient } from "./client.js";
 import { toNumber } from "../shared/num.js";
 import { isResourceLimitError } from "../shared/errors.js";
 import { validateDiagnosticQuery } from "./query-validator.js";
-import type { Verdict } from "../shared/verdict.js";
+import type { EquivalenceVerdict } from "../shared/verdict.js";
 
 export interface ColumnShape {
   name: string;
@@ -17,7 +17,7 @@ export interface VerifyEquivalentOptions {
 
 export interface VerifyEquivalentResult {
   check: "verify_equivalent";
-  verdict: Verdict; // correct | incorrect | indeterminate
+  verdict: EquivalenceVerdict;
   method: "exact-source";
   differingRows: number;
   leftOnly: number;

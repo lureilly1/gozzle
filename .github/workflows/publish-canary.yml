@@ -31,11 +31,20 @@ jobs:
       - name: Set canary version
         run: npm version "0.1.6-canary.${GITHUB_RUN_NUMBER}" --no-git-tag-version -w @gozzle/cli
 
+      - name: Format check
+        run: npm run format:check
+
+      - name: Lint
+        run: npm run lint
+
       - name: Build
         run: npm run build -w @gozzle/cli
 
       - name: Test
         run: npm test -w @gozzle/cli
+
+      - name: MCP smoke
+        run: npm run smoke:mcp -w @gozzle/cli
 
       - name: Publish canary
         run: npm publish -w @gozzle/cli --tag canary --access public

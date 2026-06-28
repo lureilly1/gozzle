@@ -137,7 +137,10 @@ test("MODIFY COLUMN uses table metadata as a full-table upper bound", async () =
   assert.equal(result.rewrite.evidence, "table-metadata-upper-bound");
   assert.equal(result.rewrite.affectedParts, 4);
   assert.equal(result.rewrite.affectedBytes, 2097152);
-  assert.deepEqual(result.correctness.map((finding) => finding.status), ["ok"]);
+  assert.deepEqual(
+    result.correctness.map((finding) => finding.status),
+    ["ok"]
+  );
   assert.equal(
     client.queries.some((query) => query.includes("accurateCastOrNull")),
     true

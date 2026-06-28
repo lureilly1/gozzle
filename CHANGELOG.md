@@ -11,6 +11,9 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) from 1.0.
 - `verify_equivalent` tool / `gozzle equivalent <a.sql> <b.sql>`: prove two
   SELECTs return the same result, entirely inside the source engine.
 - PostToolUse hook (`gozzle hook`) to auto-verify ClickHouse `.sql` changes.
+- `dry_run_migration` read-only correctness gate for mutation predicates, UPDATE
+  assignment expressions, MODIFY COLUMN casts, and DEFAULT/MATERIALIZED column
+  expressions against current ClickHouse data.
 
 ### Fixed
 

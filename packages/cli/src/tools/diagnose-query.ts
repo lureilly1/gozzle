@@ -8,6 +8,7 @@ import {
   type DiagnoseQueryResult,
   type QueryFinding
 } from "../clickhouse/query-diagnosis.js";
+import { diagnosisToRun } from "../planner/adapters/diagnosis.js";
 import { runAuditedTool } from "../shared/audit.js";
 import { withClickHouseTool } from "./with-clickhouse.js";
 
@@ -46,7 +47,8 @@ export function createDiagnoseQueryTool(server: McpServer): void {
             recommendation: z.string()
           })
         ),
-        queryFingerprint: z.string()
+        queryFingerprint: z.string(),
+        verificationRun: z.any()
       }
     },
     async ({ query }) =>
@@ -63,7 +65,7 @@ export function createDiagnoseQueryTool(server: McpServer): void {
               );
               return {
                 content: [{ type: "text", text: formatQueryDiagnosis(result) }],
-                structuredContent: buildDiagnosisStructured(result)
+                structuredContent: buildDiagnosisStructured(result, "mcp")
               };
             },
             (error) =>
@@ -117,7 +119,11 @@ export function formatQueryDiagnosis(result: DiagnoseQueryResult): string {
   return lines.join("\n");
 }
 
-export function buildDiagnosisStructured(result: DiagnoseQueryResult) {
+export function buildDiagnosisStructured(
+  result: DiagnoseQueryResult,
+  source: "cli" | "mcp" | "ci" | "hook" = "cli",
+  path?: string
+) {
   const proven = result.findings.filter((f) => f.confidence === "proven");
   const advisory = result.findings.filter((f) => f.confidence === "advisory");
   return {
@@ -125,7 +131,8 @@ export function buildDiagnosisStructured(result: DiagnoseQueryResult) {
     originalQueryExecuted: false as const,
     tables: result.tableSchemas,
     findings: result.findings,
-    queryFingerprint: fingerprint(result.query.query)
+    queryFingerprint: fingerprint(result.query.query),
+    verificationRun: diagnosisToRun(result, source, path)
   };
 }
 

@@ -20,6 +20,9 @@ try {
   const hasInspectTableTool = tools.tools.some(
     (tool) => tool.name === "inspect_table"
   );
+  const hasVerifyArtifactTool = tools.tools.some(
+    (tool) => tool.name === "verify_artifact"
+  );
   const hasVerifyDedupTool = tools.tools.some(
     (tool) => tool.name === "verify_dedup"
   );
@@ -43,6 +46,10 @@ try {
 
   if (!hasInspectTableTool) {
     throw new Error("Expected MCP server to expose an inspect_table tool.");
+  }
+
+  if (!hasVerifyArtifactTool) {
+    throw new Error("Expected MCP server to expose a verify_artifact tool.");
   }
 
   if (!hasVerifyDedupTool) {

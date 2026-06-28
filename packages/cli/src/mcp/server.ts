@@ -12,6 +12,7 @@ import { createLocalSliceTool } from "../tools/create-local-slice.js";
 import { createDryRunMigrationTool } from "../tools/dry-run-migration.js";
 import { createHealthTool } from "../tools/health.js";
 import { createInspectTableTool } from "../tools/inspect-table.js";
+import { createVerifyArtifactTool } from "../tools/verify-artifact.js";
 import { createVerifyDedupTool } from "../tools/verify-dedup.js";
 import { createVerifyEquivalentTool } from "../tools/verify-equivalent.js";
 import { readPackageMetadata } from "../shared/package-metadata.js";
@@ -25,6 +26,7 @@ export function createGozzleMcpServer(): McpServer {
 
   createHealthTool(server);
   createConnectTool(server);
+  createVerifyArtifactTool(server);
   createInspectTableTool(server);
   createVerifyDedupTool(server);
   createVerifyEquivalentTool(server);
