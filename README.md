@@ -1,11 +1,10 @@
 # gozzle
 
-**The verification layer between AI-written SQL and your ClickHouse.**
+Read-only verification for ClickHouse SQL changes.
 
-Your agent (or your teammate's agent) just rewrote a query or produced a
-migration. It looks right. gozzle proves what can be proven about it — against
-your real cluster, without executing a single write — and clearly labels what
-remains uncertain.
+gozzle runs bounded checks against your real cluster and reports what it can
+prove about a query or migration before you ship it. It was built for SQL
+written by AI agents, but it gates human changes the same way.
 
 ```
 ▸ old.sql...new.sql  (QUERY PAIR)
@@ -17,26 +16,18 @@ Findings:
 - [error] query_not_equivalent: Exact comparison found 100 differing row(s).
 ```
 
-That is a real catch: a rewrite that swapped `>=` for `>` and silently dropped a
-day of data. Linters can't see it. An agent's self-review didn't see it. Running
-both queries against the actual data did.
+## What it checks for
 
-## Why this exists
+Mistakes that pass code review but change results:
 
-Agents write plausible SQL with total confidence, and ClickHouse has sharp
-edges that plausible SQL walks straight into:
+- A query rewrite that returns a different row set.
+- A `ReplacingMergeTree` read without `FINAL` that overcounts while duplicates
+  are present.
+- A mutation whose cast or expression fails on rows that already exist.
+- A changed filter that stops pruning partitions and reads the whole table.
 
-- A `ReplacingMergeTree` read without `FINAL` silently overcounts until a merge
-  happens to run.
-- A "harmless" `ALTER TABLE ... UPDATE` casts a column and NULLs 500 rows into a
-  non-Nullable target — a failure you find out about mid-mutation.
-- A rewritten query returns a different row set for exactly one edge case.
-- A refactored filter stops pruning partitions and turns a 50 ms query into a
-  full scan.
-
-gozzle is not a linter and not an agent-observability tool. It is
-**execution-verified correctness**: it runs bounded, read-only checks against
-current data and returns a verdict backed by evidence.
+gozzle is not a linter. It executes read-only checks against current data and
+returns a verdict with evidence, a confidence level, and explicit limits.
 
 ## Install
 
@@ -48,7 +39,7 @@ Requires Node 22+. Tested against ClickHouse 24.8 and newer (CI runs 24.8; the
 checks use `EXCEPT ALL`, `EXPLAIN indexes = 1, projections = 1`, and
 `accurateCastOrNull`, so recent 23.x may work but is not verified).
 
-Point it at your cluster with a **read-only** account:
+Point it at your cluster with a read-only account:
 
 ```bash
 export GOZZLE_CLICKHOUSE_URL="https://your-instance.clickhouse.cloud:8443"
@@ -57,11 +48,11 @@ export GOZZLE_CLICKHOUSE_PASSWORD="..."
 export GOZZLE_CLICKHOUSE_DATABASE="analytics"   # optional default database
 ```
 
-Bare `CLICKHOUSE_*` variables work too; `GOZZLE_*` wins when both are set.
+Bare `CLICKHOUSE_*` variables work too. `GOZZLE_*` wins when both are set.
 
 ## First check
 
-Verify one SQL file (a `SELECT` query or an `ALTER` migration — gozzle
+Verify one SQL file (a `SELECT` query or an `ALTER` migration, gozzle
 classifies it):
 
 ```bash
@@ -74,8 +65,9 @@ Prove a rewrite returns the same rows:
 gozzle verify --before old.sql --after new.sql
 ```
 
-Verify what changed on your branch (each changed query is compared against its
-git base version as a before/after pair):
+Verify what changed on your branch. For each changed query file, gozzle reads
+the old version from the git base and proves the rewrite returns identical
+rows, with no setup:
 
 ```bash
 gozzle verify --changed
@@ -83,50 +75,52 @@ gozzle verify --diff origin/main...HEAD
 ```
 
 Exit codes are CI-ready: `0` pass, `1` a check failed the gate, `2` gozzle
-could not verify (connection, unsupported file, ...). Add `--strict` to also
-fail on warnings, `--json` for the machine-readable contract, or
+could not verify (connection, unsupported file, and so on). Add `--strict` to
+also fail on warnings, `--json` for the machine-readable contract, or
 `--format github` for a Markdown PR comment.
 
-## What it checks
+## The checks
 
 | Check | Question it answers | Evidence |
 | --- | --- | --- |
 | Query equivalence | Do two SELECTs return the same multiset of rows? | Exact: `EXCEPT ALL` both ways, computed inside ClickHouse, plus a capped sample of divergent rows |
 | Read-path proof | Does this query trust a uniqueness the data violates? | Exact: duplicate scan by sorting key on tables you declare unique (see `gozzle.yaml` below) |
 | Dedup state | Does this `ReplacingMergeTree` currently hold duplicates, and what would `FINAL` collapse? | Exact: distinguishes duplicates merges will remove from cross-partition ones they never will |
-| Query plan | Does this query scan everything / skip partition and primary-key pruning? | `EXPLAIN indexes=1` evidence with the table's actual `ORDER BY`/`PARTITION BY` in the recommendation |
-| Migration blast radius | How many parts, rows, and bytes does this ALTER touch? | Metadata + a predicate-matched part scan |
-| Migration correctness | Do the casts, expressions, and predicates hold on current data? | Read-only probes (e.g. `accurateCastOrNull`) over every affected row — catches the 500 NULLs *before* the mutation runs |
+| Query plan | Does this query scan everything or skip partition and primary key pruning? | `EXPLAIN indexes=1` evidence with the table's actual `ORDER BY` and `PARTITION BY` in the recommendation |
+| Migration blast radius | How many parts, rows, and bytes does this ALTER touch? | Metadata plus a predicate-matched part scan |
+| Migration correctness | Do the casts, expressions, and predicates hold on current data? | Read-only probes (for example `accurateCastOrNull`) over every affected row, run before the mutation ever does |
 
 Full scans are reported on every table but only block the gate for large tables
-(≥ 10M rows or ≥ 1 GiB) — a whole-table aggregate on a small table is usually
+(10M rows or 1 GiB and up). A whole-table aggregate on a small table is usually
 the intent.
 
 Every result carries its confidence (`exact`, `bounded`, `explain`, `metadata`,
 `advisory`) and its limits. gozzle will tell you "cast validated against current
-data" — it will not pretend to know lock duration, replication lag, or whether
+data". It will not claim to know lock duration, replication lag, or whether
 tomorrow's inserts stay clean.
 
 ## The read-only guarantee
 
 gozzle never executes your artifact against production. Every connection pins
 `readonly = 2` at the session level, so ClickHouse itself rejects any write or
-DDL — this is enforced by the server, not by parsing, and covered by
-integration tests against a real server with a write-capable account.
+DDL. This is enforced by the server, not by parsing, and covered by integration
+tests against a real server with a write-capable account.
 
 On top of that:
 
-- Every statement gozzle generates is a SELECT (or `EXPLAIN`/`DESCRIBE`/`SHOW CREATE`).
+- Every statement gozzle generates is a SELECT (or `EXPLAIN`, `DESCRIBE`,
+  `SHOW CREATE`).
 - Inputs are validated: one statement, no comments, no `INTO OUTFILE`, and
-  external-access table functions (`url`, `s3`, `remote`, ...) are rejected, so
-  a malicious artifact can't exfiltrate data through a verification read.
+  external-access table functions (`url`, `s3`, `remote`, and friends) are
+  rejected, so a malicious artifact cannot exfiltrate data through a
+  verification read.
 - Cost guardrails by default: 30 s `max_execution_time` and 10k
-  `max_result_rows` per query. Optional caps on rows/bytes read
+  `max_result_rows` per query. Optional caps on rows and bytes read
   (`GOZZLE_MAX_ROWS_TO_READ`, `GOZZLE_MAX_BYTES_TO_READ`) are off by default;
   set them if your cluster is busy. Oversized exact checks return
   `indeterminate` with a "scope to partition X" suggestion instead of grinding.
 
-## `gozzle.yaml` — declare what your queries assume
+## `gozzle.yaml`: declare what your queries assume
 
 Drop a `gozzle.yaml` at the repo root:
 
@@ -146,7 +140,7 @@ assumptions:
 The globs power `gozzle verify --all` and file selection for `--changed`. The
 `assumptions` power the read-path proof: any verified query that reads
 `analytics.orders` without `FINAL` gets a live duplicate check, so "duplicates
-exist" becomes "**this query** can overcount":
+exist" becomes "this query can overcount":
 
 ```
 Read-path proof:
@@ -155,9 +149,9 @@ Read-path proof:
   This query can overcount.
 ```
 
-`unique_by` must match the table's `ORDER BY` (sorting key) — that is the key
+`unique_by` must match the table's `ORDER BY` (sorting key). That is the key
 ReplacingMergeTree deduplicates by, and gozzle refuses to bind a claim to a key
-it can't prove.
+it cannot prove.
 
 ## For agents (MCP)
 
@@ -170,14 +164,14 @@ gozzle skill         # the "verify before done" agent instruction
 gozzle hook          # PostToolUse hook: auto-verify .sql files the agent edits
 ```
 
-The primary tool is **`verify_artifact`**: hand it a query or migration, gozzle
+The primary tool is `verify_artifact`: hand it a query or migration, gozzle
 classifies it, runs the strongest safe plan, and returns the verdict contract
 (verdict, confidence, findings, evidence, limits). Focused tools remain for
 deeper context: `diagnose_query`, `verify_equivalent`, `verify_dedup`,
 `dry_run_migration`, `inspect_table`, `create_local_slice`, `connect`, `health`.
 
-The hook is the deterministic path: agents sometimes forget to verify; a
-PostToolUse hook doesn't.
+The hook is the deterministic path. Agents sometimes forget to verify; a
+PostToolUse hook does not.
 
 ## In CI
 
@@ -195,11 +189,11 @@ read-only) or at a staging replica with representative data.
 
 ## Local slices (optional, deeper checks)
 
-`create_local_slice` / `gozzle slices` can replicate a single partition of a
+`create_local_slice` and `gozzle slices` can replicate a single partition of a
 `ReplacingMergeTree` into a local [chDB](https://github.com/chdb-io/chdb) engine
 for offline reproduction. Slices are explicit, size-capped, stored under
 `~/.gozzle`, and cleaned with `gozzle slices clean`. They are a reproduction
-tool — the default correctness checks all run exact-in-source against your
+tool. The default correctness checks all run exact-in-source against your
 cluster and never replicate data.
 
 chDB is an optional native dependency (linux/macOS, x86_64/arm64); everything
@@ -207,14 +201,14 @@ else works without it.
 
 ## What gozzle is not
 
-- **Not a linter.** It doesn't opine on style; it executes checks against data.
-- **Not agent observability.** It verifies the SQL produced, not the agent that
+- Not a linter. It does not opine on style; it executes checks against data.
+- Not agent observability. It verifies the SQL produced, not the agent that
   produced it.
-- **Not a migration runner.** It proves what an ALTER would do; you run it with
+- Not a migration runner. It reports what an ALTER would do; you run it with
   your own tooling.
-- **Not magic.** Checks that would require executing the migration are labeled
-  with exactly what was and wasn't proven. `correct` only ever comes from an
-  exact method.
+- Not a guarantee of everything. Checks that would require executing the
+  migration are labeled with exactly what was and was not proven. `correct`
+  only ever comes from an exact method.
 
 ## Development
 
