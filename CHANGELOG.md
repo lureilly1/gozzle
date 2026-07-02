@@ -6,6 +6,11 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) from 1.0.
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-07-02
+
+First npm release since 0.1.5: the 0.1.6 tag was never published, so this
+release also delivers everything listed under 0.1.6 below.
+
 ### Fixed
 
 - Migration cast probes no longer fail on `LowCardinality(...)` or
@@ -70,6 +75,7 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) from 1.0.
 
 Baseline release on npm. See the git history for details.
 
-[Unreleased]: https://github.com/lureilly1/gozzle/compare/v0.1.6...HEAD
+[Unreleased]: https://github.com/lureilly1/gozzle/compare/v0.1.7...HEAD
+[0.1.7]: https://github.com/lureilly1/gozzle/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/lureilly1/gozzle/releases/tag/v0.1.6
 [0.1.5]: https://github.com/lureilly1/gozzle/releases/tag/v0.1.5

@@ -1,6 +1,6 @@
 {
   "name": "@gozzle/cli",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Agent verification layer for ClickHouse changes.",
   "type": "module",
   "private": false,
