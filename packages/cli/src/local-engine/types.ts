@@ -11,4 +11,10 @@ export interface LocalReplayInput {
 export interface LocalEngine {
   readonly name: string;
   replay(input: LocalReplayInput): Promise<ClickHouseMetadataClient>;
+  /**
+   * Reopen a client against an already-replayed workspace, without recreating
+   * or reloading data. Used to shadow-execute statements (e.g. an ALTER
+   * mutation) against a slice that `replay` persisted to disk.
+   */
+  open(workspacePath: string): Promise<ClickHouseMetadataClient>;
 }

@@ -8,6 +8,16 @@ import {
   dryRunMigration,
   type DryRunMigrationResult
 } from "../clickhouse/migration.js";
+import {
+  readEphemeralSliceConfig,
+  readLocalSliceConfig
+} from "../config/local-slice.js";
+import { ChdbLocalEngine } from "../local-engine/chdb.js";
+import {
+  shadowExecuteMigration,
+  ShadowMigrationUnsupportedError,
+  type ShadowMigrationResult
+} from "../local-engine/shadow-migration.js";
 import { migrationToRun } from "../planner/adapters/migration.js";
 import { formatBytes, formatCount } from "../shared/format.js";
 import { runAuditedTool } from "../shared/audit.js";
@@ -24,7 +34,14 @@ export function createDryRunMigrationTool(server: McpServer): void {
         statement: z
           .string()
           .min(1)
-          .describe("One ClickHouse ALTER TABLE statement to assess.")
+          .describe("One ClickHouse ALTER TABLE statement to assess."),
+        partitionId: z
+          .string()
+          .min(1)
+          .optional()
+          .describe(
+            "Physical partition_id to shadow-execute the mutation against. When provided, gozzle replays that complete partition into an ephemeral local chDB slice, actually runs the ALTER there, and reports the real before/after effect. Never touches production. Supported for predicate UPDATE and DELETE mutations."
+          )
       },
       outputSchema: {
         status: z.enum(["pass", "review", "unknown"]),
@@ -52,25 +69,42 @@ export function createDryRunMigrationTool(server: McpServer): void {
           })
         ),
         statementSha256: z.string(),
-        verificationRun: z.any()
+        verificationRun: z.any(),
+        shadow: z.any().optional(),
+        shadowSkippedReason: z.string().optional()
       }
     },
-    async ({ statement }) =>
+    async ({ statement, partitionId }) =>
       runAuditedTool(
         "dry_run_migration",
-        { statementSha256: fingerprint(statement) },
+        { statementSha256: fingerprint(statement), partitionId },
         () =>
           withClickHouseTool(
             async (client, config) => {
+              const defaultDatabase = config.database ?? "default";
               const result = await dryRunMigration(client, {
                 statement,
-                defaultDatabase: config.database ?? "default"
+                defaultDatabase
               });
+              const shadow = await runShadowExecution(
+                client,
+                statement,
+                partitionId,
+                defaultDatabase
+              );
               return {
                 content: [
-                  { type: "text", text: formatMigrationResult(result) }
+                  {
+                    type: "text",
+                    text: formatMigrationResult(result, shadow)
+                  }
                 ],
-                structuredContent: buildMigrationStructured(result, "mcp")
+                structuredContent: buildMigrationStructured(
+                  result,
+                  "mcp",
+                  undefined,
+                  shadow
+                )
               };
             },
             (error) =>
@@ -80,7 +114,53 @@ export function createDryRunMigrationTool(server: McpServer): void {
   );
 }
 
-export function formatMigrationResult(result: DryRunMigrationResult): string {
+/**
+ * The outcome of the optional chDB shadow-execution escalation: either a real
+ * result, or a human-readable reason it did not run. Shadow execution is
+ * best-effort — it never fails the dry run, because the read-only estimate is
+ * always the primary verdict.
+ */
+export type ShadowOutcome =
+  | { kind: "result"; result: ShadowMigrationResult }
+  | { kind: "skipped"; reason: string };
+
+async function runShadowExecution(
+  client: Parameters<Parameters<typeof withClickHouseTool>[0]>[0],
+  statement: string,
+  partitionId: string | undefined,
+  defaultDatabase: string
+): Promise<ShadowOutcome> {
+  if (!partitionId) {
+    return {
+      kind: "skipped",
+      reason:
+        "No partitionId was provided. Pass one to shadow-execute this mutation in an ephemeral local chDB slice."
+    };
+  }
+  try {
+    const result = await shadowExecuteMigration(
+      client,
+      new ChdbLocalEngine(),
+      { statement, partitionId, defaultDatabase },
+      readLocalSliceConfig(),
+      readEphemeralSliceConfig()
+    );
+    return { kind: "result", result };
+  } catch (error) {
+    if (error instanceof ShadowMigrationUnsupportedError) {
+      return { kind: "skipped", reason: error.message };
+    }
+    return {
+      kind: "skipped",
+      reason: `Shadow execution could not run: ${errorMessage(error)}`
+    };
+  }
+}
+
+export function formatMigrationResult(
+  result: DryRunMigrationResult,
+  shadow?: ShadowOutcome
+): string {
   const { parsed, footprint, rewrite } = result;
   const lines = [
     `Status: ${migrationStatus(parsed.classification)}`,
@@ -127,6 +207,10 @@ export function formatMigrationResult(result: DryRunMigrationResult): string {
     );
   }
 
+  if (shadow) {
+    lines.push("", ...formatShadowSection(shadow));
+  }
+
   lines.push(
     "",
     `Advice: ${parsed.advice}`,
@@ -135,6 +219,38 @@ export function formatMigrationResult(result: DryRunMigrationResult): string {
     parsed.statement
   );
   return lines.join("\n");
+}
+
+function formatShadowSection(shadow: ShadowOutcome): string[] {
+  if (shadow.kind === "skipped") {
+    return ["Shadow execution (chDB):", `- not run: ${shadow.reason}`];
+  }
+  const { result } = shadow;
+  const lines = [
+    "Shadow execution (chDB): the exact ALTER was run against an ephemeral local slice; production was not touched.",
+    `- partition: ${result.partitionId} (${formatCount(result.sliceRows)} rows replayed)`,
+    `- rows matching predicate: ${formatCount(result.matchedRows)}`
+  ];
+  if (!result.executed) {
+    lines.push(
+      `- verdict: REJECTED; ClickHouse refused the statement against faithful data: ${result.executionError}`
+    );
+    return lines;
+  }
+  if (result.operation === "DELETE") {
+    lines.push(
+      `- rows deleted: ${formatCount(result.rowsDeleted)} (${formatCount(
+        result.before.rows
+      )} -> ${formatCount(result.after.rows)} physical rows)`,
+      "- verdict: OK; the DELETE executed against faithful data."
+    );
+  } else {
+    lines.push(
+      `- rows rewritten: ${formatCount(result.matchedRows)}`,
+      "- verdict: OK; the UPDATE executed against faithful data."
+    );
+  }
+  return lines;
 }
 
 function migrationVerdict(result: DryRunMigrationResult): string {
@@ -166,7 +282,8 @@ function migrationVerdict(result: DryRunMigrationResult): string {
 export function buildMigrationStructured(
   result: DryRunMigrationResult,
   source: "cli" | "mcp" | "ci" | "hook" = "cli",
-  path?: string
+  path?: string,
+  shadow?: ShadowOutcome
 ) {
   const classification = result.parsed.classification;
   return {
@@ -184,7 +301,11 @@ export function buildMigrationStructured(
     correctnessStatus: correctnessVerdict(result.correctness),
     correctness: result.correctness,
     statementSha256: fingerprint(result.parsed.statement),
-    verificationRun: migrationToRun(result, source, path)
+    verificationRun: migrationToRun(result, source, path),
+    ...(shadow?.kind === "result" ? { shadow: shadow.result } : {}),
+    ...(shadow?.kind === "skipped"
+      ? { shadowSkippedReason: shadow.reason }
+      : {})
   };
 }
 

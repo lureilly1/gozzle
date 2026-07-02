@@ -28,8 +28,7 @@ export class ChdbLocalEngine implements LocalEngine {
   readonly name = "chDB";
 
   async replay(input: LocalReplayInput): Promise<ClickHouseMetadataClient> {
-    const Session = await loadChdbSession();
-    const session = new Session(join(input.workspacePath, "chdb"));
+    const session = await this.openSession(input.workspacePath);
     const client = new ChdbMetadataClient(session);
 
     try {
@@ -46,6 +45,19 @@ export class ChdbLocalEngine implements LocalEngine {
       await client.close();
       throw error;
     }
+  }
+
+  async open(workspacePath: string): Promise<ClickHouseMetadataClient> {
+    return new ChdbMetadataClient(await this.openSession(workspacePath));
+  }
+
+  // chDB persists each session to its own on-disk directory. Reopening the same
+  // path (after an earlier session was cleaned up) exposes the replayed table
+  // again — the data survives `cleanup`; only the temporary directory removal
+  // done by the caller destroys it.
+  private async openSession(workspacePath: string): Promise<Session> {
+    const Session = await loadChdbSession();
+    return new Session(join(workspacePath, "chdb"));
   }
 }
 

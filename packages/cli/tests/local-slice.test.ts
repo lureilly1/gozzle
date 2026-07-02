@@ -105,6 +105,10 @@ class FakeLocalEngine implements LocalEngine {
     this.replayInput = input;
     return new FakeClient(1);
   }
+
+  async open(): Promise<FakeClient> {
+    return new FakeClient(1);
+  }
 }
 
 const replacingCreate = `CREATE TABLE analytics.events

@@ -3,7 +3,12 @@ import test from "node:test";
 
 import type { ClickHouseMetadataClient } from "../src/clickhouse/client.js";
 import { dryRunMigration } from "../src/clickhouse/migration.js";
-import { formatMigrationResult } from "../src/tools/dry-run-migration.js";
+import type { ShadowMigrationResult } from "../src/local-engine/shadow-migration.js";
+import {
+  buildMigrationStructured,
+  formatMigrationResult,
+  type ShadowOutcome
+} from "../src/tools/dry-run-migration.js";
 
 class FakeMetadataClient implements ClickHouseMetadataClient {
   queries: string[] = [];
@@ -110,6 +115,100 @@ test("metadata-only dry run reports zero physical rewrite", async () => {
   const text = formatMigrationResult(result);
   assert.match(text, /Status: PASS/);
   assert.match(text, /no existing data-part rewrite expected/);
+});
+
+function shadowResult(
+  overrides: Partial<ShadowMigrationResult> = {}
+): ShadowMigrationResult {
+  return {
+    engine: "chDB",
+    table: "analytics.events",
+    partitionId: "202606",
+    operation: "DELETE",
+    sliceRows: 3,
+    matchedRows: 1,
+    executed: true,
+    rowsDeleted: 1,
+    executedStatement:
+      "ALTER TABLE gozzle_slice.`events` DELETE WHERE id = 'a'",
+    before: { rows: 3, duplicateGroups: 0, duplicateRows: 0, maxCopies: 0 },
+    after: { rows: 2, duplicateGroups: 0, duplicateRows: 0, maxCopies: 0 },
+    productionExecuted: false,
+    ...overrides
+  };
+}
+
+test("formatMigrationResult renders an executed shadow DELETE", async () => {
+  const result = await dryRunMigration(new FakeMetadataClient(), {
+    statement: "ALTER TABLE analytics.events DELETE WHERE id = 'a'",
+    defaultDatabase: "default"
+  });
+  const text = formatMigrationResult(result, {
+    kind: "result",
+    result: shadowResult()
+  });
+  assert.match(text, /Shadow execution \(chDB\)/);
+  assert.match(text, /rows deleted: 1/);
+  assert.match(text, /production was not touched/);
+});
+
+test("formatMigrationResult surfaces a shadow rejection as REJECTED", async () => {
+  const result = await dryRunMigration(new FakeMetadataClient(), {
+    statement: "ALTER TABLE analytics.events UPDATE id = 'z' WHERE id = 'a'",
+    defaultDatabase: "default"
+  });
+  const text = formatMigrationResult(result, {
+    kind: "result",
+    result: shadowResult({
+      operation: "UPDATE",
+      executed: false,
+      executionError: "Cannot UPDATE key column `id`",
+      rowsDeleted: 0,
+      after: { rows: 3, duplicateGroups: 0, duplicateRows: 0, maxCopies: 0 }
+    })
+  });
+  assert.match(text, /REJECTED/);
+  assert.match(text, /Cannot UPDATE key column/);
+});
+
+test("formatMigrationResult explains a skipped shadow run", async () => {
+  const result = await dryRunMigration(new FakeMetadataClient(), {
+    statement: "ALTER TABLE analytics.events DELETE WHERE id = 'a'",
+    defaultDatabase: "default"
+  });
+  const skipped: ShadowOutcome = {
+    kind: "skipped",
+    reason: "No partitionId was provided."
+  };
+  const text = formatMigrationResult(result, skipped);
+  assert.match(text, /Shadow execution \(chDB\):/);
+  assert.match(text, /not run: No partitionId/);
+});
+
+test("buildMigrationStructured attaches shadow result and skip reason", async () => {
+  const result = await dryRunMigration(new FakeMetadataClient(), {
+    statement: "ALTER TABLE analytics.events DELETE WHERE id = 'a'",
+    defaultDatabase: "default"
+  });
+  const withResult = buildMigrationStructured(result, "mcp", undefined, {
+    kind: "result",
+    result: shadowResult()
+  });
+  assert.equal(
+    (withResult as { shadow?: ShadowMigrationResult }).shadow?.executed,
+    true
+  );
+  assert.equal("shadowSkippedReason" in withResult, false);
+
+  const withSkip = buildMigrationStructured(result, "mcp", undefined, {
+    kind: "skipped",
+    reason: "chDB unavailable"
+  });
+  assert.equal(
+    (withSkip as { shadowSkippedReason?: string }).shadowSkippedReason,
+    "chDB unavailable"
+  );
+  assert.equal("shadow" in withSkip, false);
 });
 
 test("ADD COLUMN DEFAULT validates its expression without claiming a rewrite", async () => {
