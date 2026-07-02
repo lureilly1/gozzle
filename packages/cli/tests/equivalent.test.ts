@@ -132,6 +132,47 @@ test("a literal containing 'rand(' does not trigger non-determinism", async () =
   assert.equal(result.verdict, "correct");
 });
 
+test("LIMIT without a top-level ORDER BY is indeterminate and runs nothing", async () => {
+  const client = new FakeClient(() => {
+    throw new Error("should not be queried");
+  });
+  const result = await verifyEquivalent(client, {
+    left: "SELECT a FROM t LIMIT 10",
+    right: "SELECT a FROM t LIMIT 10"
+  });
+  assert.equal(result.verdict, "indeterminate");
+  assert.match(
+    result.indeterminateReason ?? "",
+    /LIMIT without a top-level ORDER BY/
+  );
+  assert.equal(client.queries.length, 0);
+});
+
+test("LIMIT with a top-level ORDER BY is compared normally", async () => {
+  const client = new FakeClient((q) => {
+    if (q.includes("DESCRIBE")) return shape([["a", "UInt64"]]);
+    if (q.includes("countIf")) return [{ left_only: "0", right_only: "0" }];
+    return [];
+  });
+  const result = await verifyEquivalent(client, {
+    left: "SELECT a FROM t ORDER BY a LIMIT 10",
+    right: "SELECT a FROM t ORDER BY a LIMIT 10"
+  });
+  assert.equal(result.verdict, "correct");
+});
+
+test("a SAMPLE clause is indeterminate", async () => {
+  const client = new FakeClient(() => {
+    throw new Error("should not be queried");
+  });
+  const result = await verifyEquivalent(client, {
+    left: "SELECT a FROM t SAMPLE 0.1",
+    right: "SELECT a FROM t"
+  });
+  assert.equal(result.verdict, "indeterminate");
+  assert.match(result.indeterminateReason ?? "", /SAMPLE/);
+});
+
 test("a scan-limit abort maps to indeterminate", async () => {
   const client = new FakeClient((q) => {
     if (q.includes("DESCRIBE")) return shape([["a", "UInt64"]]);

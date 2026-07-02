@@ -72,11 +72,42 @@ test("diagnoseQuery attaches table ORDER BY / PARTITION BY and makes the fix con
   assert.ok(fullScan, "expected a full-scan finding");
   assert.match(fullScan!.recommendation, /PARTITION BY is \(toYYYYMM\(ts\)\)/);
   assert.match(fullScan!.recommendation, /ORDER BY is \(user_id, event_id\)/);
+  // 1000 rows is below the blocking threshold: proven, but not gate-blocking.
+  assert.equal(fullScan!.severity, "medium");
+  assert.match(fullScan!.evidence ?? "", /table has 1000 row/);
 
   const text = formatQueryDiagnosis(result);
   assert.match(text, /Status: FAIL/);
   assert.match(text, /ORDER BY: user_id, event_id/);
   assert.match(text, /PARTITION BY: toYYYYMM\(ts\)/);
+});
+
+test("a full scan of a large table stays gate-blocking", async () => {
+  class LargeTableClient extends SchemaAwareClient {
+    override async queryJson<T>(query: string): Promise<T[]> {
+      if (query.includes("FROM system.tables")) {
+        return [
+          {
+            engine: "MergeTree",
+            engine_full: "MergeTree",
+            sorting_key: "user_id",
+            primary_key: "user_id",
+            partition_key: "",
+            total_rows: "50000000",
+            total_bytes: "8000000000"
+          }
+        ] as T[];
+      }
+      return super.queryJson(query);
+    }
+  }
+  const result = await diagnoseQuery(
+    new LargeTableClient(),
+    "SELECT * FROM analytics.events",
+    "default"
+  );
+  const fullScan = result.findings.find((f) => f.code === "full-scan");
+  assert.equal(fullScan?.severity, "high");
 });
 
 test("diagnoseQuery degrades gracefully when a table cannot be inspected", async () => {

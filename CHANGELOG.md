@@ -6,6 +6,30 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) from 1.0.
 
 ## [Unreleased]
 
+### Fixed
+
+- Migration cast probes no longer fail on `LowCardinality(...)` or
+  `Nullable(...)` target types: the probe casts to the inner type, so
+  `MODIFY COLUMN status LowCardinality(String)` validates instead of erroring
+  (`accurateCastOrNull` rejects types that cannot sit inside Nullable). Targets
+  that cannot be probed at all (Array, Tuple, Map, ...) now report an honest
+  `unknown` instead of a false error.
+- The ClickHouse client no longer prints its own error log to stderr when a
+  probe query fails; gozzle reports the failure itself.
+
+### Changed
+
+- A proven full scan only blocks the verify gate for large tables (>= 10M rows
+  or >= 1 GiB); on smaller tables it is reported as a non-blocking warning,
+  since whole-table aggregates there are usually intentional. Table size is now
+  included in the finding's evidence.
+- The read-path proof refuses to bind a `unique_by` assumption to a table whose
+  sorting key differs, and says how to fix the assumption, instead of reporting
+  sorting-key duplicates as a violation of the declared columns.
+- `verify_equivalent` returns `indeterminate` for queries whose row set is
+  unstable across evaluations: a top-level `LIMIT` without `ORDER BY`, or a
+  `SAMPLE` clause.
+
 ## [0.1.6]
 
 ### Added

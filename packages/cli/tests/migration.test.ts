@@ -145,6 +145,50 @@ test("MODIFY COLUMN uses table metadata as a full-table upper bound", async () =
     client.queries.some((query) => query.includes("accurateCastOrNull")),
     true
   );
+  // accurateCastOrNull rejects LowCardinality targets (nothing wrapped in
+  // Nullable may contain it), so the probe must cast to the inner type.
+  const probe = client.queries.find((query) =>
+    query.includes("accurateCastOrNull")
+  );
+  assert.match(probe ?? "", /accurateCastOrNull\(__gozzle_value, 'String'\)/);
+});
+
+test("a cast target that cannot be probed reports unknown instead of failing", async () => {
+  const client = new FakeMetadataClient();
+  const result = await dryRunMigration(client, {
+    statement:
+      "ALTER TABLE analytics.events MODIFY COLUMN status Array(String)",
+    defaultDatabase: "default"
+  });
+  assert.deepEqual(
+    result.correctness.map((finding) => finding.status),
+    ["unknown"]
+  );
+  assert.match(
+    result.correctness[0]?.message ?? "",
+    /cannot be checked with a read-only cast probe/
+  );
+  assert.equal(
+    client.queries.some((query) => query.includes("accurateCastOrNull")),
+    false
+  );
+});
+
+test("a Nullable cast target probes its inner type", async () => {
+  const client = new FakeMetadataClient();
+  const result = await dryRunMigration(client, {
+    statement:
+      "ALTER TABLE analytics.events MODIFY COLUMN status Nullable(UInt64)",
+    defaultDatabase: "default"
+  });
+  assert.deepEqual(
+    result.correctness.map((finding) => finding.status),
+    ["ok"]
+  );
+  const probe = client.queries.find((query) =>
+    query.includes("accurateCastOrNull")
+  );
+  assert.match(probe ?? "", /accurateCastOrNull\(__gozzle_value, 'UInt64'\)/);
 });
 
 test("predicate mutation estimates matching rows and full touched parts", async () => {

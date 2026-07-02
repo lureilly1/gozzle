@@ -1,4 +1,8 @@
-import { createClient, type ClickHouseClient } from "@clickhouse/client";
+import {
+  ClickHouseLogLevel,
+  createClient,
+  type ClickHouseClient
+} from "@clickhouse/client";
 import { createWriteStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { pipeline } from "node:stream/promises";
@@ -44,7 +48,10 @@ export class ClickHouseHttpMetadataClient implements ClickHouseExportClient {
       password: config.password,
       database: config.database,
       // Apply read-only + cost guardrails to every statement on this client.
-      clickhouse_settings: this.settings
+      clickhouse_settings: this.settings,
+      // Probe failures are expected evidence (e.g. a cast that cannot hold);
+      // gozzle reports them itself, so keep the client's own logging quiet.
+      log: { level: ClickHouseLogLevel.OFF }
     });
   }
 

@@ -51,6 +51,20 @@ export async function checkReadPaths(
     if (!dedup.eligible) continue;
 
     const keys = assumption.uniqueBy.join(", ");
+    // The proof scans for duplicates by the table's sorting key (that is what
+    // ReplacingMergeTree deduplicates by). If the declared unique_by names a
+    // different key, the proof would report evidence about a key the user never
+    // claimed, so refuse to bind them instead of guessing.
+    if (!sameColumnSet(assumption.uniqueBy, dedup.sortingKey ?? "")) {
+      outcomes.push({
+        table: table.table,
+        uniqueBy: assumption.uniqueBy,
+        status: "unknown",
+        duplicateRows: 0,
+        message: `${table.table} is declared unique by (${keys}), but its dedup (sorting) key is (${dedup.sortingKey ?? "none"}). gozzle proves duplicates by sorting key; update unique_by to match the table's ORDER BY.`
+      });
+      continue;
+    }
     if (dedup.scanSkipped) {
       outcomes.push({
         table: table.table,
@@ -78,6 +92,21 @@ export async function checkReadPaths(
     }
   }
   return outcomes;
+}
+
+/** Order-insensitive comparison of unique_by columns to a sorting-key string. */
+function sameColumnSet(uniqueBy: string[], sortingKey: string): boolean {
+  const normalize = (value: string) =>
+    value
+      .trim()
+      .replace(/^`(.*)`$/, "$1")
+      .toLowerCase();
+  const declared = new Set(uniqueBy.map(normalize));
+  const key = sortingKey
+    .split(",")
+    .map(normalize)
+    .filter((column) => column !== "");
+  return key.length === declared.size && key.every((c) => declared.has(c));
 }
 
 function findAssumption(

@@ -114,6 +114,25 @@ test("read-path proof is clean when current data has no duplicates", async () =>
   assert.equal(outcomes[0].status, "clean");
 });
 
+test("read-path proof refuses to bind unique_by to a different sorting key", async () => {
+  const mismatched: GozzleProjectConfig = {
+    queries: [],
+    migrations: [],
+    assumptions: { events: { uniqueBy: ["session_id"] } }
+  };
+  const outcomes = await checkReadPaths(
+    client("3"),
+    diagnosis(),
+    mismatched,
+    "default",
+    NO_AUDIT
+  );
+  assert.equal(outcomes.length, 1);
+  assert.equal(outcomes[0].status, "unknown");
+  assert.match(outcomes[0].message, /dedup \(sorting\) key is \(event_id\)/);
+  assert.match(outcomes[0].message, /update unique_by/);
+});
+
 test("read-path proof is skipped when the query already uses FINAL", async () => {
   const outcomes = await checkReadPaths(
     client("3"),

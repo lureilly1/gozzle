@@ -289,7 +289,15 @@ async function runCastProbe(
     subject: string;
   }
 ): Promise<CorrectnessFinding> {
-  const targetTypeLiteral = quoteStringLiteral(options.targetType);
+  const probeType = probeTargetType(options.targetType);
+  if (!probeType) {
+    return {
+      check: options.check,
+      status: "unknown",
+      message: `${options.subject} was not validated: ${options.targetType} cannot be checked with a read-only cast probe.`
+    };
+  }
+  const targetTypeLiteral = quoteStringLiteral(probeType);
   const where = options.predicate ? `WHERE (${options.predicate})` : "";
   const tableName = formatTableIdentifier(options.identifier);
   const nullableTarget = allowsNullType(options.targetType);
@@ -377,6 +385,26 @@ function emptyEstimate(): MigrationRewriteEstimate {
     affectedBytes: 0,
     evidence: "none"
   };
+}
+
+// Types that cannot sit inside Nullable, which accurateCastOrNull requires.
+const UNPROBEABLE_TYPE =
+  /^(Array|Tuple|Map|Nested|AggregateFunction|SimpleAggregateFunction|JSON|Object|Variant|Dynamic|Point|Ring|Polygon|MultiPolygon)\b/i;
+
+/**
+ * The type the cast probe can hand to accurateCastOrNull. LowCardinality and
+ * Nullable wrappers are stripped: neither can appear inside Nullable, and a
+ * value converts to the wrapped type exactly when it converts to the inner
+ * type. Returns undefined when the base type itself cannot be probed.
+ */
+function probeTargetType(type: string): string | undefined {
+  let inner = type.trim();
+  for (;;) {
+    const match = inner.match(/^(?:LowCardinality|Nullable)\s*\(([\s\S]*)\)$/i);
+    if (!match) break;
+    inner = match[1].trim();
+  }
+  return !inner || UNPROBEABLE_TYPE.test(inner) ? undefined : inner;
 }
 
 function allowsNullType(type: string): boolean {

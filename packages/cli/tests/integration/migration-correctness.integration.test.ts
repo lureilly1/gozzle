@@ -76,7 +76,10 @@ test(
       assert.equal(result.parsed.classification, "part-rewriting");
       assert.equal(result.correctness[0]?.check, "cast-safety");
       assert.equal(result.correctness[0]?.status, "error");
-      assert.match(result.correctness[0]?.message ?? "", /cannot be cast/i);
+      assert.match(
+        result.correctness[0]?.message ?? "",
+        /failed conversion to UInt64 for 1 current row/i
+      );
     } finally {
       await client.close();
     }

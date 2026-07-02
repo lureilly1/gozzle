@@ -2,6 +2,7 @@ import type { ClickHouseMetadataClient } from "./client.js";
 import { toNumber } from "../shared/num.js";
 import { isResourceLimitError } from "../shared/errors.js";
 import { validateDiagnosticQuery } from "./query-validator.js";
+import { findTopLevelKeyword, maskQuoted } from "./sql-scan.js";
 import type { EquivalenceVerdict } from "../shared/verdict.js";
 
 export interface ColumnShape {
@@ -62,6 +63,15 @@ export async function verifyEquivalent(
       ...base,
       verdict: "indeterminate",
       indeterminateReason: `Query is non-deterministic (uses ${nonDeterministic}); equivalence cannot be proven.`
+    };
+  }
+
+  const unstable = firstUnstableRowSet(left) ?? firstUnstableRowSet(right);
+  if (unstable) {
+    return {
+      ...base,
+      verdict: "indeterminate",
+      indeterminateReason: `Query ${unstable}, so its row set is not stable and equivalence cannot be proven.`
     };
   }
 
@@ -166,6 +176,25 @@ function firstNonDeterministic(query: string): string | undefined {
   const masked = query.replace(/'(?:[^'\\]|\\.|'')*'/g, "''");
   const match = masked.match(NON_DETERMINISTIC);
   return match ? match[1] : undefined;
+}
+
+/**
+ * Constructs that make the row multiset itself unstable across evaluations:
+ * a top-level LIMIT without ORDER BY picks arbitrary rows, and SAMPLE reads a
+ * nondeterministic subset. Each side of the comparison evaluates independently,
+ * so an unstable row set cannot be proven equivalent to anything.
+ */
+function firstUnstableRowSet(query: string): string | undefined {
+  if (
+    findTopLevelKeyword(query, "LIMIT") !== -1 &&
+    findTopLevelKeyword(query, "ORDER") === -1
+  ) {
+    return "uses LIMIT without a top-level ORDER BY";
+  }
+  if (/\bSAMPLE\s+[\d.]/i.test(maskQuoted(query))) {
+    return "uses a SAMPLE clause";
+  }
+  return undefined;
 }
 
 function clampSampleLimit(value: number | undefined): number {

@@ -26,6 +26,8 @@ export interface QueryTableSchema {
   table: string;
   orderBy?: string;
   partitionBy?: string;
+  totalRows?: number;
+  totalBytes?: number;
 }
 
 export interface DiagnoseQueryResult {
@@ -35,6 +37,11 @@ export interface DiagnoseQueryResult {
   findings: QueryFinding[];
   originalQueryExecuted: false;
 }
+
+// A proven full scan blocks the gate only above this size; below it the
+// finding is still reported, but as a non-blocking warning.
+const FULL_SCAN_BLOCKING_ROWS = 10_000_000;
+const FULL_SCAN_BLOCKING_BYTES = 1024 * 1024 * 1024;
 
 export async function diagnoseQuery(
   client: ClickHouseMetadataClient,
@@ -91,7 +98,9 @@ async function readTableSchemas(
       schemas.push({
         table: table.table,
         orderBy: inspection.orderBy ?? inspection.sortingKey,
-        partitionBy: inspection.partitionBy
+        partitionBy: inspection.partitionBy,
+        totalRows: inspection.totalRows,
+        totalBytes: inspection.totalBytes
       });
     } catch {
       schemas.push({ table: table.table });
@@ -124,12 +133,23 @@ function diagnoseTable(
     selectsEverything(baseParts) &&
     selectsEverything(finalGranules)
   ) {
+    // A full scan of a small table is often the intent (whole-table
+    // aggregates); only a large table makes it a blocking regression. When the
+    // size is unknown, stay conservative and treat it as large.
+    const small =
+      schema?.totalRows !== undefined &&
+      schema.totalRows < FULL_SCAN_BLOCKING_ROWS &&
+      (schema.totalBytes ?? 0) < FULL_SCAN_BLOCKING_BYTES;
+    const sizeNote =
+      schema?.totalRows !== undefined
+        ? `, table has ${schema.totalRows} row(s)`
+        : "";
     findings.push({
       confidence: "proven",
-      severity: "high",
+      severity: small ? "medium" : "high",
       code: "full-scan",
       message: `${table.table} scans every reported part and granule.`,
-      evidence: `parts ${formatRatio(baseParts)}, granules ${formatRatio(finalGranules)}`,
+      evidence: `parts ${formatRatio(baseParts)}, granules ${formatRatio(finalGranules)}${sizeNote}`,
       recommendation: `Align filters with the partition or leading ORDER BY keys, or evaluate a projection for this access pattern.${partitionHint}${orderByHint}`
     });
   }
